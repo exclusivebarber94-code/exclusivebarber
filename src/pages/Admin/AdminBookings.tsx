@@ -269,7 +269,7 @@ export default function AdminBookings() {
           onClose={() => setShowNewClient(false)}
           onSaved={(count, clientName) => {
             setShowNewClient(false);
-            setNotice(count === 1 ? 'Cliente registrado: el servicio ya está en las reservas.' : `Cliente registrado: sus ${count} servicios ya están en las reservas.`);
+            setNotice(count === 1 ? 'Cliente registrado: el servicio quedó como completado y ya cuenta en los reportes.' : `Cliente registrado: sus ${count} servicios quedaron como completados y ya cuentan en los reportes.`);
             setReloadKey((k) => k + 1);
             // Se muestra lo recién registrado (la tabla va de la fecha más lejana a la más cercana)
             setSearch(clientName);

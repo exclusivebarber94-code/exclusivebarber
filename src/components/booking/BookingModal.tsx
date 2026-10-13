@@ -141,7 +141,8 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label="Reservar cita">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !loading && onClose()} />
+      {/* Tocar afuera no cierra la reserva (se perdería lo elegido): solo la ✕ o al terminar */}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
 
       <div className="relative w-full sm:max-w-2xl bg-[#0d0d0d] border border-white/10 rounded-t-3xl sm:rounded-3xl overflow-hidden animate-slide-up h-[92vh] sm:h-[min(90vh,760px)] flex flex-col">
         {ticket ? (

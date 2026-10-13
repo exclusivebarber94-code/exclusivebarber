@@ -17,6 +17,7 @@
     "@supabase/realtime-js": "^2.8.4",
     "@supabase/supabase-js": "^2.45.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "exceljs": "^4.4.0",
     "heic-to": "1.5.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
