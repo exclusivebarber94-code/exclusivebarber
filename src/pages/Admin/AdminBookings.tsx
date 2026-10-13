@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Download, ChevronDown, Loader2, MessageCircle } from 'lucide-react';
+import { Search, Download, ChevronDown, Loader2, MessageCircle, UserPlus, CheckCircle2 } from 'lucide-react';
 import { getBookings, updateBookingStatus } from '../../services/bookings';
 import { formatCOP } from '../../data';
 import { dayOfMonth, monthShort, dayShort } from '../../lib/dates';
@@ -8,6 +8,7 @@ import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import type { Booking } from '../../types';
 import { Panel, StatusBadge, Initials } from '../../components/admin/ui';
 import DataTable, { type Column } from '../../components/admin/DataTable';
+import NewClientModal from '../../components/admin/NewClientModal';
 
 const STATUSES = Object.keys(STATUS_LABEL) as BookingStatus[];
 
@@ -25,6 +26,9 @@ export default function AdminBookings() {
   const [list, setList] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useAutoRefresh(() => {
     getBookings()
@@ -34,7 +38,7 @@ export default function AdminBookings() {
         setError('No se pudieron cargar las reservas. Se reintentará automáticamente.');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [reloadKey]);
 
   const query = search.toLowerCase().trim();
   const digits = search.replace(/\D/g, '');
@@ -142,8 +146,21 @@ export default function AdminBookings() {
   return (
     <div className="space-y-5">
       {error && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+      {notice && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+          <CheckCircle2 size={16} className="shrink-0" /> {notice}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={() => { setNotice(''); setShowNewClient(true); }}
+          className="btn-gold px-4 py-3 rounded-xl text-sm font-semibold justify-center sm:order-last"
+          title="Registrar un cliente atendido en la barbería o fuera del horario"
+        >
+          <UserPlus size={15} />
+          <span>Cliente nuevo</span>
+        </button>
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
@@ -192,6 +209,20 @@ export default function AdminBookings() {
           />
         )}
       </Panel>
+
+      {showNewClient && (
+        <NewClientModal
+          onClose={() => setShowNewClient(false)}
+          onSaved={(count, clientName) => {
+            setShowNewClient(false);
+            setNotice(count === 1 ? 'Cliente registrado: el servicio ya está en las reservas.' : `Cliente registrado: sus ${count} servicios ya están en las reservas.`);
+            setReloadKey((k) => k + 1);
+            // Se muestra lo recién registrado (la tabla va de la fecha más lejana a la más cercana)
+            setSearch(clientName);
+            setStatusFilter('todos');
+          }}
+        />
+      )}
     </div>
   );
 }

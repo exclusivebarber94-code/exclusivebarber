@@ -198,6 +198,50 @@ export async function createBooking(booking: NewBooking): Promise<CreatedBooking
   };
 }
 
+// ---------------------------------------------------------------------------
+// Registro manual desde el panel (clientes atendidos en la barbería o fuera del horario)
+// ---------------------------------------------------------------------------
+
+export interface ManualBookingLine {
+  serviceId: string;
+  serviceName: string;
+  time: string;
+  price: number;
+}
+
+/**
+ * Guarda de una vez (todo o nada) los servicios de un cliente registrado por el administrador.
+ * No pasa por las reglas de la reserva web: sirve a cualquier hora. Si ya se atendió, no se
+ * envía WhatsApp de confirmación (se marca como avisada).
+ */
+export async function createManualBookings(input: {
+  clientName: string;
+  clientPhone: string;
+  barberId: string;
+  barberName: string;
+  date: string;
+  status: Booking['status'];
+  lines: ManualBookingLine[];
+}): Promise<void> {
+  const skipWhatsApp = input.status === 'completed' || input.status === 'cancelled';
+  const rows = input.lines.map((line) => ({
+    client_name: input.clientName.trim(),
+    client_phone: input.clientPhone.trim(),
+    client_email: '',
+    service_id: line.serviceId,
+    service_name: line.serviceName,
+    barber_id: input.barberId,
+    barber_name: input.barberName,
+    date: input.date,
+    time: line.time,
+    price: line.price,
+    status: input.status,
+    ...(skipWhatsApp ? { whatsapp_sent_at: new Date().toISOString() } : {}),
+  }));
+  const { error } = await supabase.from('bookings').insert(rows);
+  if (error) throw error;
+}
+
 /** Reservas creadas desde `sinceIso` (fecha y hora ISO), de la más nueva a la más vieja. Solo administradores. */
 export async function getRecentlyCreatedBookings(sinceIso: string, limit = 30): Promise<Booking[]> {
   const { data, error } = await supabase
