@@ -138,10 +138,8 @@ export default function BookingTicket({ ticket, onClose }: Props) {
       {/* Lo que está dentro de ticketRef es lo que se descarga como imagen: solo colores sólidos */}
       <div ref={ticketRef} className="keep-dark w-full max-w-sm rounded-3xl overflow-hidden" style={{ background: '#121212', border: '1px solid #5c4a14' }}>
         <div className="px-6 pt-6 pb-5 text-center" style={{ background: 'linear-gradient(160deg, #2a2108 0%, #121212 75%)' }}>
-          <img src="/logo_exclusivebarber.png" alt="" className="w-16 h-16 mx-auto object-contain mb-2" />
-          <p className="font-script text-3xl leading-none" style={{ color: '#E8C766' }}>Exclusive</p>
-          <p className="text-[10px] font-bold tracking-[0.35em] text-white mt-1">BARBER</p>
-          <p className="text-[11px] uppercase tracking-[0.2em] mt-4" style={{ color: '#a1a1aa' }}>Reserva confirmada</p>
+          <img src="/logo_exclusivebarber.png" alt={businessConfig.name} className="w-28 h-28 mx-auto object-contain" />
+          <p className="text-[11px] uppercase tracking-[0.2em] mt-3" style={{ color: '#a1a1aa' }}>Reserva confirmada</p>
           <p className="font-mono text-2xl font-bold tracking-widest mt-1" style={{ color: '#D4AF37' }}>{code}</p>
         </div>
 

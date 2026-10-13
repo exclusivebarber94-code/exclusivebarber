@@ -4,11 +4,11 @@ import { getBookingsInRange } from '../../services/bookings';
 import { getBarbers } from '../../services/barbers';
 import { todayKey, addDays, startOfWeek, dayOfMonth } from '../../lib/dates';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
+import { businessConfig } from '../../config/business';
 import type { Booking, Barber } from '../../types';
 
 type ViewMode = 'day' | 'week';
 
-const HOURS = Array.from({ length: 10 }, (_, i) => `${(i + 9).toString().padStart(2, '0')}:00`); // 9:00 a 18:00 (se atiende hasta las 19:00)
 const DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const UNASSIGNED = '__sin_asignar__';
 
@@ -23,6 +23,23 @@ const statusColors: Record<string, string> = {
 function getWeekDates(dateKey: string): string[] {
   const monday = startOfWeek(dateKey);
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+}
+
+/**
+ * Filas del calendario: desde las 8:00 (o antes si el horario abre más temprano) hasta la última
+ * hora de atención configurada. Si hay citas por fuera (p. ej. clientes registrados fuera del
+ * horario), el rango se amplía para que siempre se vean.
+ */
+function calendarHours(bookings: Booking[]): string[] {
+  const days = [...businessConfig.hours, businessConfig.holidayHours].filter((h) => !h.closed);
+  let first = Math.min(8, ...days.map((h) => Number(h.open.slice(0, 2))));
+  // Una hora que cierra en punto (19:00) no necesita fila propia; 19:30 sí
+  let last = Math.max(18, ...days.map((h) => Number(h.close.slice(0, 2)) - (h.close.endsWith(':00') ? 1 : 0)));
+  for (const b of bookings) {
+    const h = Number(b.time.slice(0, 2));
+    if (Number.isFinite(h)) { first = Math.min(first, h); last = Math.max(last, h); }
+  }
+  return Array.from({ length: last - first + 1 }, (_, i) => `${String(first + i).padStart(2, '0')}:00`);
 }
 
 function inHour(booking: Booking, hour: string): boolean {
@@ -66,6 +83,7 @@ export default function AdminCalendar() {
   };
 
   const today = todayKey();
+  const HOURS = calendarHours(bookings);
   const barberIds = new Set(barbers.map((b) => b.id));
   const dayBookings = bookings.filter((b) => b.date === currentDate);
   const unassigned = dayBookings.filter((b) => !barberIds.has(b.barberId));
