@@ -35,6 +35,9 @@ export const businessConfig: BusinessConfig = {
   //   'closed':  no se trabaja
   // «El primero que esté libre» al reservar (se apaga en Panel → Configuración → Reglas)
   allowAnyBarber: true,
+  // Almuerzo: no se reciben reservas por la web en ese rango, salvo domingos y festivos
+  // (se cambia en Panel → Configuración → Horario)
+  lunch: { enabled: true, start: '12:00', end: '13:00' },
   // Reglas de reserva (se cambian en Panel → Configuración → Reglas)
   slotStep: 30,
   daysAhead: 14,

@@ -1,6 +1,6 @@
 import type { BusySlot } from '../services/bookings';
 import { todayKey, nowMinutes, timeToMinutes, minutesToTime } from './dates';
-import { bookingHoursFor } from './businessHours';
+import { bookingHoursFor, lunchFor } from './businessHours';
 import { businessConfig } from '../config/business';
 
 // Cada cuánto empieza una cita (businessConfig.slotStep, editable en Panel → Configuración → Reglas).
@@ -31,11 +31,15 @@ export function generateSlots(
   if (!hours) return [];
   const isToday = date === todayKey();
   const now = nowMinutes();
+  const lunch = lunchFor(date);
   const slots = [];
   for (let start = hours.open; start + duration <= hours.close; start += businessConfig.slotStep) {
+    // Durante el almuerzo no se ofrecen horas; las que se cruzarían con él salen ocupadas
+    if (lunch && start >= lunch.start && start < lunch.end) continue;
+    const crossesLunch = !!lunch && start < lunch.end && start + duration > lunch.start;
     const isPast = isToday && start <= now;
     const someoneFree = barberIds.some((id) => isBarberFree(busy, id, start, duration));
-    slots.push({ time: minutesToTime(start), available: !isPast && someoneFree });
+    slots.push({ time: minutesToTime(start), available: !isPast && !crossesLunch && someoneFree });
   }
   return slots;
 }

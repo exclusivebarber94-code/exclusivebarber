@@ -35,6 +35,16 @@ export function hoursFor(dateKey: string): { open: number; close: number; openLa
   return { open: timeToMinutes(entry.open), close: timeToMinutes(entry.close), openLabel: entry.open, closeLabel: entry.close };
 }
 
+/**
+ * Almuerzo de ese día en minutos, o null si no aplica: está apagado, es domingo o festivo
+ * (se atiende de corrido) o la barbería no abre ese día.
+ */
+export function lunchFor(dateKey: string): { start: number; end: number; startLabel: string; endLabel: string } | null {
+  const { enabled, start, end } = businessConfig.lunch;
+  if (!enabled || weekday(dateKey) === 0 || holidayName(dateKey) || !hoursFor(dateKey)) return null;
+  return { start: timeToMinutes(start), end: timeToMinutes(end), startLabel: start, endLabel: end };
+}
+
 /** Horario en que se puede reservar por la web: null si está cerrado o se atiende por orden de llegada. */
 export function bookingHoursFor(dateKey: string): ReturnType<typeof hoursFor> {
   return specialDayOf(dateKey) === 'walk-in' ? null : hoursFor(dateKey);
@@ -53,6 +63,10 @@ export function openStatus(): { open: boolean; label: string } {
   const now = nowMinutes();
   const holiday = holidayName(todayK);
   if (today && now >= today.open && now < today.close) {
+    const lunch = lunchFor(todayK);
+    if (lunch && now >= lunch.start && now < lunch.end) {
+      return { open: false, label: `En almuerzo · volvemos a las ${formatHour(lunch.endLabel)}` };
+    }
     const note = specialDayOf(todayK) === 'walk-in' ? ' · por orden de llegada' : holiday ? ' (festivo)' : '';
     return { open: true, label: `Abierto ahora${note} · cierra a las ${formatHour(today.closeLabel)}` };
   }

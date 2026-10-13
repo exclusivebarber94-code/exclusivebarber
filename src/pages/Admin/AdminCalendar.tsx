@@ -5,6 +5,7 @@ import { getBarbers } from '../../services/barbers';
 import { todayKey, addDays, startOfWeek, dayOfMonth } from '../../lib/dates';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { businessConfig } from '../../config/business';
+import { lunchFor } from '../../lib/businessHours';
 import type { Booking, Barber } from '../../types';
 
 type ViewMode = 'day' | 'week';
@@ -41,6 +42,15 @@ function calendarHours(bookings: Booking[]): string[] {
   }
   return Array.from({ length: last - first + 1 }, (_, i) => `${String(first + i).padStart(2, '0')}:00`);
 }
+
+/** true si esa hora del calendario cae en el almuerzo de ese día (no aplica domingos ni festivos) */
+function isLunchHour(dateKey: string, hour: string): boolean {
+  const lunch = lunchFor(dateKey);
+  const start = Number(hour.slice(0, 2)) * 60;
+  return !!lunch && start < lunch.end && start + 60 > lunch.start;
+}
+
+const LUNCH_BG = 'bg-[repeating-linear-gradient(135deg,rgba(212,175,55,0.06)_0,rgba(212,175,55,0.06)_6px,transparent_6px,transparent_12px)]';
 
 function inHour(booking: Booking, hour: string): boolean {
   return booking.time.slice(0, 2) === hour.slice(0, 2);
@@ -157,10 +167,13 @@ export default function AdminCalendar() {
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="grid border-b border-white/5"
+                  className={`grid border-b border-white/5 ${isLunchHour(currentDate, hour) ? LUNCH_BG : ''}`}
                   style={{ gridTemplateColumns: `64px repeat(${Math.max(columns.length, 1)}, 1fr)`, minHeight: '60px' }}
                 >
-                  <div className="p-3 text-zinc-600 text-xs font-mono">{hour}</div>
+                  <div className="p-3 text-zinc-600 text-xs font-mono">
+                    {hour}
+                    {isLunchHour(currentDate, hour) && <span className="block font-sans text-[10px] text-gold/70 mt-0.5">Almuerzo</span>}
+                  </div>
                   {columns.map((c) => {
                     const source = c.id === UNASSIGNED ? unassigned : dayBookings.filter((b) => b.barberId === c.id);
                     const slots = sortForDisplay(source.filter((b) => inHour(b, hour)));
@@ -208,7 +221,8 @@ export default function AdminCalendar() {
                     const isToday = d === today;
                     const daySlots = sortForDisplay(bookings.filter((b) => b.date === d && inHour(b, hour)));
                     return (
-                      <div key={d} className={`border-l border-white/5 p-1 space-y-1 ${isToday ? 'bg-gold/3' : ''}`}>
+                      <div key={d} className={`border-l border-white/5 p-1 space-y-1 ${isToday ? 'bg-gold/3' : ''} ${isLunchHour(d, hour) ? LUNCH_BG : ''}`}>
+                        {isLunchHour(d, hour) && daySlots.length === 0 && <p className="text-[10px] text-gold/50 text-center pt-1">Almuerzo</p>}
                         {daySlots.map((slot) => (
                           <div key={slot.id} className={`rounded border px-1.5 py-1 text-[10px] ${statusColors[slot.status] || 'border-white/20 text-zinc-300'}`}>
                             <p className="font-semibold truncate leading-tight">{slot.time} {slot.clientName}</p>

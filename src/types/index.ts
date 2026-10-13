@@ -86,6 +86,12 @@ export interface SpecialDay {
   noticeFrom?: string;
 }
 
+export interface LunchBreak {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
 export interface BusinessConfig {
   name: string;
   tagline: string;
@@ -103,6 +109,8 @@ export interface BusinessConfig {
   specialDays: SpecialDay[];
   /** Mostrar «El primero que esté libre» al reservar */
   allowAnyBarber: boolean;
+  /** Almuerzo: sin reservas por la web en ese rango (no aplica domingos ni festivos) */
+  lunch: LunchBreak;
   /** Cada cuántos minutos empieza una cita (09:00, 09:30…) */
   slotStep: number;
   /** Con cuántos días de anticipación se puede reservar por la web */

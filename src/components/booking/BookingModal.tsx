@@ -29,11 +29,12 @@ const ERROR_MESSAGES: Record<BookingErrorCode, string> = {
   CLOSED_DAY: 'Ese día no hay reservas por la web (la barbería está cerrada o atiende por orden de llegada). Elige otra fecha.',
   BARBER_REQUIRED: 'Elige con quién quieres tu cita.',
   WRONG_PROFESSIONAL: 'Esa persona no realiza este servicio. Elige a otra, por favor.',
+  LUNCH_BREAK: 'A esa hora estamos en almuerzo. Elige otra hora, por favor.',
   UNKNOWN: 'No pudimos confirmar tu reserva por un problema de conexión. Intenta de nuevo o escríbenos por WhatsApp.',
 };
 
 // Si la hora ya no sirve, el cliente vuelve a elegir la cita
-const BACK_TO_APPOINTMENT: BookingErrorCode[] = ['SLOT_TAKEN', 'NO_BARBER_AVAILABLE', 'PAST_DATE', 'INVALID_TIME', 'SERVICE_NOT_FOUND', 'CLOSED_DAY', 'BARBER_REQUIRED', 'WRONG_PROFESSIONAL'];
+const BACK_TO_APPOINTMENT: BookingErrorCode[] = ['SLOT_TAKEN', 'NO_BARBER_AVAILABLE', 'PAST_DATE', 'INVALID_TIME', 'SERVICE_NOT_FOUND', 'CLOSED_DAY', 'BARBER_REQUIRED', 'WRONG_PROFESSIONAL', 'LUNCH_BREAK'];
 
 // Aviso por WhatsApp al cliente y al dueño (función de Vercel api/send-whatsapp).
 // Si falla, la cita igual queda guardada y el cliente tiene su ticket en pantalla.

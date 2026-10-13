@@ -161,16 +161,18 @@ function HoursRow({ value, onChange }: { value: BusinessHours; onChange: (v: Bus
 function HoursTab() {
   const [hours, setHours] = useState(() => currentSettings().hours);
   const [holiday, setHoliday] = useState(() => currentSettings().holidayHours);
+  const [lunch, setLunch] = useState(() => currentSettings().lunch);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<Status>(null);
 
   const save = async () => {
     const bad = [...hours, holiday].find((h) => !h.closed && (!h.open || !h.close || h.open >= h.close));
     if (bad) return setStatus({ kind: 'error', text: `Revisa el horario de ${bad.day}: la hora de cierre debe ser después de la de apertura.` });
+    if (!lunch.start || !lunch.end || lunch.start >= lunch.end) return setStatus({ kind: 'error', text: 'Revisa el almuerzo: la hora de regreso debe ser después de la de salida.' });
     setSaving(true);
     setStatus(null);
     try {
-      await saveSettings({ hours, holidayHours: holiday });
+      await saveSettings({ hours, holidayHours: holiday, lunch });
       setStatus({ kind: 'ok', text: 'Horario guardado. Las reservas ya usan el horario nuevo.' });
     } catch (err) {
       console.error('No se pudo guardar el horario', err);
@@ -191,6 +193,36 @@ function HoursTab() {
       <p className="text-zinc-500 text-xs mt-3 leading-relaxed">
         Los festivos de Colombia se detectan solos. Próximos: {upcomingHolidays(todayKey(), 3).map((h) => `${inSentence(h.date)} (${h.name})`).join(' · ')}.
       </p>
+      <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-white text-sm font-semibold">Almuerzo</p>
+            <p className="text-zinc-500 text-xs">En ese rango no se reciben reservas por la web. No aplica domingos ni festivos (se atiende de corrido).</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={lunch.enabled}
+            aria-label="Almuerzo"
+            onClick={() => setLunch({ ...lunch, enabled: !lunch.enabled })}
+            className={`relative w-14 h-8 rounded-full shrink-0 transition-colors ${lunch.enabled ? 'bg-emerald-500' : 'bg-zinc-600'}`}
+          >
+            <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow transition-all ${lunch.enabled ? 'left-7' : 'left-1'}`} />
+          </button>
+        </div>
+        {lunch.enabled && (
+          <div className="grid grid-cols-2 gap-3 mt-3 max-w-xs">
+            <label>
+              <span className={labelClass}>Sale a almorzar</span>
+              <input id="lunch-start" type="time" className={`${inputClass} [color-scheme:dark]`} value={lunch.start} onChange={(e) => setLunch({ ...lunch, start: e.target.value })} />
+            </label>
+            <label>
+              <span className={labelClass}>Regresa</span>
+              <input id="lunch-end" type="time" className={`${inputClass} [color-scheme:dark]`} value={lunch.end} onChange={(e) => setLunch({ ...lunch, end: e.target.value })} />
+            </label>
+          </div>
+        )}
+      </div>
       <SaveBar saving={saving} status={status} onSave={save} />
     </Panel>
   );

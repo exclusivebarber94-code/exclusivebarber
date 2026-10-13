@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Search, Download, ChevronDown, Loader2, MessageCircle, UserPlus, CheckCircle2 } from 'lucide-react';
-import { getBookings, updateBookingStatus } from '../../services/bookings';
+import { Search, Download, ChevronDown, Loader2, MessageCircle, UserPlus, CheckCircle2, Trash2 } from 'lucide-react';
+import { getBookings, updateBookingStatus, deleteBooking } from '../../services/bookings';
 import { formatCOP } from '../../data';
 import { dayOfMonth, monthShort, dayShort } from '../../lib/dates';
 import { STATUS_LABEL, type BookingStatus } from '../../lib/stats';
@@ -29,6 +29,9 @@ export default function AdminBookings() {
   const [showNewClient, setShowNewClient] = useState(false);
   const [notice, setNotice] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  // Reserva que pide confirmación antes de eliminarse, y la que se está eliminando
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useAutoRefresh(() => {
     getBookings()
@@ -62,6 +65,22 @@ export default function AdminBookings() {
       console.error('No se pudo cambiar el estado de la reserva', err);
       if (previous) setList((prev) => prev.map((b) => (b.id === id ? { ...b, status: previous } : b)));
       setError('No se pudo guardar el cambio de estado. Intenta de nuevo.');
+    }
+  };
+
+  const removeBooking = async (b: Booking) => {
+    setDeletingId(b.id);
+    try {
+      await deleteBooking(b.id);
+      setList((prev) => prev.filter((x) => x.id !== b.id));
+      setConfirmId(null);
+      setError('');
+      setNotice(`Reserva de ${b.clientName} (${b.serviceName}, ${b.date} ${b.time}) eliminada.`);
+    } catch (err) {
+      console.error('No se pudo eliminar la reserva', err);
+      setError('No se pudo eliminar la reserva. Intenta de nuevo.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -111,20 +130,55 @@ export default function AdminBookings() {
     { key: 'price', header: 'Total', align: 'right', render: (b) => <span className="text-gold font-mono font-bold whitespace-nowrap">{formatCOP(b.price)}</span> },
     { key: 'status', header: 'Estado', aside: true, render: (b) => <StatusBadge status={b.status} /> },
     {
-      key: 'change', header: 'Cambiar estado',
-      render: (b) => (
-        <div className="relative inline-block w-full md:w-auto">
-          <select
-            value={b.status}
-            onChange={(e) => changeStatus(b.id, e.target.value as BookingStatus)}
-            aria-label={`Cambiar estado de la cita de ${b.clientName}`}
-            className="w-full md:w-auto text-xs pl-3 pr-8 py-2 bg-[#141414] border border-white/12 hover:border-gold/40 rounded-lg text-zinc-200 focus:outline-none focus:border-gold/60 cursor-pointer appearance-none transition-colors"
-          >
-            {STATUSES.map((s) => <option key={s} value={s} className="bg-[#181818]">{STATUS_LABEL[s]}</option>)}
-          </select>
-          <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
-        </div>
-      ),
+      key: 'change', header: 'Estado / eliminar',
+      render: (b) =>
+        confirmId === b.id ? (
+          // Confirmación en el mismo lugar, para que la tabla no crezca
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <button
+              type="button"
+              onClick={() => removeBooking(b)}
+              disabled={deletingId === b.id}
+              title="Confirmar: eliminar esta reserva"
+              className="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/90 hover:bg-red-500 text-white text-xs font-semibold disabled:opacity-60"
+            >
+              {deletingId === b.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              Eliminar
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmId(null)}
+              disabled={deletingId === b.id}
+              title="Cancelar"
+              className="px-3 py-2 rounded-lg border border-white/12 text-zinc-300 hover:text-white text-xs font-semibold"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <div className="relative flex-1 md:flex-none">
+              <select
+                value={b.status}
+                onChange={(e) => changeStatus(b.id, e.target.value as BookingStatus)}
+                aria-label={`Cambiar estado de la cita de ${b.clientName}`}
+                className="w-full md:w-auto text-xs pl-3 pr-8 py-2 bg-[#141414] border border-white/12 hover:border-gold/40 rounded-lg text-zinc-200 focus:outline-none focus:border-gold/60 cursor-pointer appearance-none transition-colors"
+              >
+                {STATUSES.map((s) => <option key={s} value={s} className="bg-[#181818]">{STATUS_LABEL[s]}</option>)}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+            </div>
+            <button
+              type="button"
+              onClick={() => { setConfirmId(b.id); setNotice(''); }}
+              aria-label={`Eliminar la reserva de ${b.clientName}`}
+              title="Eliminar reserva"
+              className="shrink-0 p-2 rounded-lg border border-white/10 text-zinc-500 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 transition-colors"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ),
     },
   ];
 
