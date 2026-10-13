@@ -3,6 +3,7 @@ import { ClipperIcon } from '../common/BarberIcons';
 import { formatCOP } from '../../data';
 import { formatDateLong, timeToMinutes, minutesToTime } from '../../lib/dates';
 import { isValidName, isValidPhone, type ClientContact } from '../../lib/clientContact';
+import { cartUnits, cartDuration, cartPrice } from '../../lib/bookingCart';
 import type { Appointment } from './AppointmentStep';
 
 interface Props {
@@ -15,17 +16,16 @@ interface Props {
 }
 
 export default function DetailsStep({ appointment, contact, loading, onChange, onConfirm, onBack }: Props) {
-  const { service, barber, date, time } = appointment;
-  const turns = appointment.turns || 1;
-  const endTime = minutesToTime(timeToMinutes(time) + turns * (service?.duration ?? 0));
+  const { items, barber, date, time } = appointment;
+  const units = cartUnits(items);
+  const endTime = minutesToTime(timeToMinutes(time) + cartDuration(items));
   const nameOk = isValidName(contact.name);
   const phoneOk = isValidPhone(contact.phone);
 
   const rows = [
-    { icon: ClipperIcon, label: 'Servicio', value: `${service?.name} · ${service?.duration} min${turns > 1 ? ` × ${turns} turnos` : ''}` },
     { icon: User, label: 'Barbero', value: barber?.name ?? 'El que esté libre' },
     { icon: CalendarDays, label: 'Fecha', value: formatDateLong(date) },
-    { icon: Clock, label: 'Hora', value: turns > 1 ? `${time} a ${endTime} (seguidos)` : time },
+    { icon: Clock, label: 'Hora', value: units > 1 ? `${time} a ${endTime} (seguidos)` : time },
   ];
 
   return (
@@ -43,6 +43,18 @@ export default function DetailsStep({ appointment, contact, loading, onChange, o
         </button>
 
         <div className="rounded-2xl border border-gold/25 bg-gold/[0.05] p-4 mb-6">
+          <div className="flex items-start gap-3 py-1.5">
+            <ClipperIcon size={15} className="text-gold shrink-0 mt-0.5" />
+            <span className="text-zinc-500 text-sm w-16 shrink-0">{units === 1 ? 'Servicio' : 'Servicios'}</span>
+            <ul className="flex-1 min-w-0 space-y-1">
+              {items.map(({ service, qty }) => (
+                <li key={service.id} className="flex justify-between gap-3 text-sm">
+                  <span className="text-white font-medium">{qty} × {service.name}</span>
+                  <span className="font-mono text-zinc-400 shrink-0">{formatCOP(qty * service.price)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
           {rows.map(({ icon: Icon, label, value }) => (
             <div key={label} className="flex items-center gap-3 py-1.5">
               <Icon size={15} className="text-gold shrink-0" />
@@ -52,7 +64,7 @@ export default function DetailsStep({ appointment, contact, loading, onChange, o
           ))}
           <div className="border-t border-white/10 mt-3 pt-3 flex justify-between items-center">
             <span className="text-zinc-400 text-sm">Total · pagas en la barbería</span>
-            <span className="font-mono text-xl font-bold gold-text">{formatCOP((service?.price ?? 0) * turns)}</span>
+            <span className="font-mono text-xl font-bold gold-text">{formatCOP(cartPrice(items))}</span>
           </div>
         </div>
 

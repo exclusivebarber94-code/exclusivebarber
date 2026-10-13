@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Loader2, Users, Check, Sun, Sunset, CalendarX } from 'lucide-react';
+import { Clock, Loader2, Users, Sun, Sunset, CalendarX, Minus, Plus, X } from 'lucide-react';
 import { getServices } from '../../services/services';
 import { getBarbers } from '../../services/barbers';
 import { getBusySlots, type BusySlot } from '../../services/bookings';
@@ -11,16 +11,16 @@ import { formatCOP } from '../../data';
 import BarberAvatar from '../common/BarberAvatar';
 import { CategoryIcon } from '../common/BarberIcons';
 import { businessConfig } from '../../config/business';
-import type { Service, Barber, StaffRole } from '../../types';
+import { MAX_CART_UNITS, roleFor, cartRole, cartUnits, cartDuration, cartPrice, changeQty, type CartItem } from '../../lib/bookingCart';
+import type { Service, Barber } from '../../types';
 
 export interface Appointment {
-  service: Service | null;
+  /** Servicios elegidos con su cantidad; se atienden uno detrás de otro */
+  items: CartItem[];
   /** null = cualquier barbero disponible (el servidor asigna uno libre) */
   barber: Barber | null;
   date: string;
   time: string;
-  /** Cuántos turnos seguidos (por ejemplo, el cliente y su hijo) */
-  turns: number;
 }
 
 interface Props {
@@ -30,10 +30,6 @@ interface Props {
 }
 
 const DAYS_AHEAD = 14;
-
-/** Quién hace cada servicio: manicura → manicurista; lo demás → barbero */
-const roleFor = (service: Service | null): StaffRole => (service?.category === 'manicura' ? 'manicurista' : 'barbero');
-const MAX_TURNS = 10;
 
 function SectionTitle({ number, children, hint }: { number: number; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
@@ -59,7 +55,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [loadingBusy, setLoadingBusy] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const turnsRef = useRef<HTMLElement>(null);
+  const cartRef = useRef<HTMLElement>(null);
   const dayRef = useRef<HTMLElement>(null);
   const barberRef = useRef<HTMLElement>(null);
   const timeRef = useRef<HTMLElement>(null);
@@ -97,15 +93,19 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
     loadBusy(Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(todayKey(), i))).finally(() => setLoadingBusy(false));
   }, [loadBusy]);
 
-  const turns = value.turns || 1;
-  // Varios turnos se atienden uno detrás de otro: se busca un hueco del largo de todos
-  const duration = (value.service?.duration ?? 30) * turns;
+  const items = value.items;
+  const hasItems = items.length > 0;
+  const units = cartUnits(items);
+  const total = cartPrice(items);
+  // Los servicios se atienden uno detrás de otro: se busca un hueco del largo de todos
+  const duration = cartDuration(items) || 30;
+  const role = cartRole(items) ?? 'barbero';
   const freeTimes = (day: string, barberIds: string[]) =>
     busyByDate[day] ? generateSlots(day, busyByDate[day], barberIds, duration).filter((s) => s.available).map((s) => s.time) : [];
 
   // Solo se ofrece el equipo que hace el servicio elegido
-  const team = barbers.filter((b) => b.role === roleFor(value.service));
-  const teamAway = awayBarbers.filter((b) => b.role === roleFor(value.service));
+  const team = barbers.filter((b) => b.role === role);
+  const teamAway = awayBarbers.filter((b) => b.role === role);
   // «El primero que esté libre» se puede apagar en Panel → Configuración → Reglas
   const allowAny = businessConfig.allowAnyBarber;
   const allIds = team.map((b) => b.id);
@@ -121,42 +121,43 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
     if (value.date) loadBusy([value.date]);
   }, [value.date, loadBusy]);
 
-  const update = (patch: Partial<Appointment>) => onChange({ ...value, date, ...patch });
+  // El día propuesto no se fija hasta que la persona toca un día o una hora: así se recalcula
+  // al cambiar el pedido (más servicios = se necesita un hueco más largo) o el barbero
+  const update = (patch: Partial<Appointment>) => onChange({ ...value, ...patch });
 
   // Al elegir algo, la pantalla baja sola a la siguiente pregunta
   const scrollTo = (ref: React.RefObject<HTMLElement>) =>
     window.setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 90);
 
-  const chooseService = (service: Service) => {
-    const role = roleFor(service);
-    const candidates = barbers.filter((b) => b.role === role);
-    // Si el profesional elegido no hace este servicio, se quita; si hay que elegir y solo hay uno, se elige solo
-    const keep = value.barber && value.barber.role === role ? value.barber : null;
+  // Sumar o quitar servicios cambia el tiempo total: la hora elegida se vuelve a escoger
+  const changeService = (service: Service, delta: number) => {
+    const next = changeQty(items, service, delta);
+    const nextRole = cartRole(next);
+    const candidates = barbers.filter((b) => b.role === nextRole);
+    // Si el profesional elegido no hace estos servicios, se quita; si hay que elegir y solo hay uno, se elige solo
+    const keep = value.barber && value.barber.role === nextRole ? value.barber : null;
     const barber = keep ?? (!allowAny && candidates.length === 1 ? candidates[0] : null);
-    update({ service, barber, time: '' });
-    scrollTo(turnsRef);
-  };
-  const chooseTurns = (n: number) => {
-    update({ turns: n, time: '' });
-    scrollTo(dayRef);
+    update({ items: next, barber, time: '' });
   };
   const chooseDay = (key: string) => {
     update({ date: key, time: '' });
     scrollTo(barberRef);
   };
   const chooseBarber = (barber: Barber | null) => {
-    update({ barber, time: '' });
+    // Se queda en el día que se está viendo si esa persona tiene horas; si no, se propone su primer día libre
+    const ids = barber ? [barber.id] : allIds;
+    update({ barber, time: '', date: value.date || (freeTimes(date, ids).length > 0 ? date : '') });
     scrollTo(timeRef);
   };
 
-  const allSlots = value.service && !mustChoose && busyByDate[date] ? generateSlots(date, busyByDate[date], selectedIds, duration) : [];
+  const allSlots = hasItems && !mustChoose && busyByDate[date] ? generateSlots(date, busyByDate[date], selectedIds, duration) : [];
   const freeCount = allSlots.filter((s) => s.available).length;
   const morning = allSlots.filter((s) => s.time < '12:00');
   const afternoon = allSlots.filter((s) => s.time >= '12:00');
   const nextDayForBarber = value.barber
     ? dates.find((d) => d > date && freeTimes(d, [value.barber!.id]).length > 0)
     : undefined;
-  const ready = !!value.service && !!value.time && !mustChoose;
+  const ready = hasItems && !!value.time && !mustChoose;
 
   const dayStatus = (key: string) => {
     if (!hoursFor(key)) return { label: 'Cerrado', tone: 'off' as const };
@@ -170,7 +171,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
   const slotButton = ({ time, available }: { time: string; available: boolean }) => (
     <button
       key={time}
-      onClick={() => available && update({ time })}
+      onClick={() => available && update({ date, time })}
       disabled={!available}
       aria-pressed={value.time === time}
       title={available ? undefined : 'Ocupado'}
@@ -194,66 +195,120 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
         )}
 
         <section>
-          <SectionTitle number={1}>¿Qué te quieres hacer?</SectionTitle>
+          <SectionTitle number={1} hint="Puedes elegir varios y la cantidad de cada uno">¿Qué te quieres hacer?</SectionTitle>
           {loadingCatalog ? (
             <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-gold" /></div>
           ) : (
             <div className="grid sm:grid-cols-2 gap-2">
               {services.map((service) => {
-                const selected = value.service?.id === service.id;
+                const qty = items.find((i) => i.service.id === service.id)?.qty ?? 0;
+                const selected = qty > 0;
+                // Manicura y barbería los atiende gente distinta: se reservan por separado
+                const otherRole = hasItems && roleFor(service) !== role;
+                const full = units >= MAX_CART_UNITS;
                 return (
-                  <button
+                  <div
                     key={service.id}
-                    onClick={() => chooseService(service)}
-                    aria-pressed={selected}
-                    className={`text-left p-3.5 rounded-xl border transition-all ${
+                    className={`rounded-xl border transition-all ${
                       selected ? 'border-gold bg-gold/10 shadow-gold' : 'border-white/10 bg-white/[0.03] hover:border-gold/40'
-                    }`}
+                    } ${otherRole ? 'opacity-40' : ''}`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="flex items-start gap-2 text-white text-sm font-medium leading-snug">
-                        <CategoryIcon category={service.category} size={17} className={`shrink-0 mt-px ${selected ? 'text-gold' : 'text-gold/70'}`} />
-                        {service.name}
-                      </span>
-                      {selected
-                        ? <Check size={16} className="text-gold shrink-0 mt-0.5" />
-                        : service.popular && <span className="text-[9px] font-bold uppercase tracking-wide text-gold bg-gold/15 px-1.5 py-0.5 rounded shrink-0">Popular</span>}
+                    <button
+                      type="button"
+                      onClick={() => !otherRole && changeService(service, 1)}
+                      disabled={otherRole || (full && !selected)}
+                      aria-label={`Agregar ${service.name}`}
+                      className="w-full text-left p-3.5 pb-2 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="flex items-start gap-2 text-white text-sm font-medium leading-snug">
+                          <CategoryIcon category={service.category} size={17} className={`shrink-0 mt-px ${selected ? 'text-gold' : 'text-gold/70'}`} />
+                          {service.name}
+                        </span>
+                        {service.popular && !selected && <span className="text-[9px] font-bold uppercase tracking-wide text-gold bg-gold/15 px-1.5 py-0.5 rounded shrink-0">Popular</span>}
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="flex items-center gap-1 text-zinc-500 text-xs"><Clock size={11} />{service.duration} min</span>
+                        <span className="font-mono text-sm font-bold gold-text">{formatCOP(service.price)}</span>
+                      </div>
+                    </button>
+                    <div className="flex items-center justify-between gap-2 px-3.5 pb-3">
+                      {otherRole ? (
+                        <span className="text-[11px] text-zinc-500">Se reserva aparte</span>
+                      ) : selected ? (
+                        <span className="text-[11px] font-semibold text-gold">{formatCOP(qty * service.price)}</span>
+                      ) : (
+                        <span className="text-[11px] text-zinc-500">Toca para agregar</span>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => changeService(service, -1)}
+                          disabled={!selected}
+                          aria-label={`Quitar un ${service.name}`}
+                          className="w-8 h-8 rounded-full border border-white/15 text-zinc-300 flex items-center justify-center hover:border-gold/50 hover:text-gold disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className={`w-6 text-center font-mono text-base font-bold ${selected ? 'text-gold' : 'text-zinc-600'}`} aria-label={`Cantidad de ${service.name}`}>{qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => changeService(service, 1)}
+                          disabled={otherRole || full}
+                          aria-label={`Agregar un ${service.name}`}
+                          className="w-8 h-8 rounded-full border border-gold/40 text-gold flex items-center justify-center hover:bg-gold/15 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <span className="flex items-center gap-1 text-zinc-500 text-xs"><Clock size={11} />{service.duration} min</span>
-                      <span className="font-mono text-sm font-bold gold-text">{formatCOP(service.price)}</span>
-                    </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
           )}
         </section>
 
-        {value.service && (
+        {hasItems && (
           <div className="space-y-7">
-            <section ref={turnsRef} className="scroll-mt-4">
-              <SectionTitle number={2} hint="Uno detrás de otro, con el mismo barbero">¿Cuántos turnos?</SectionTitle>
-              <div className="grid grid-cols-5 gap-2">
-                {Array.from({ length: MAX_TURNS }, (_, i) => i + 1).map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => chooseTurns(n)}
-                    aria-pressed={turns === n}
-                    className={`py-2.5 rounded-xl border text-center transition-all ${
-                      turns === n ? 'border-gold bg-gold/15 text-gold' : 'border-white/10 bg-white/[0.03] text-zinc-300 hover:border-gold/40'
-                    }`}
-                  >
-                    <span className="block font-mono text-xl font-bold">{n}</span>
-                    <span className="block text-[10px] uppercase tracking-wider opacity-80">{n === 1 ? 'turno' : 'turnos'}</span>
-                  </button>
-                ))}
+            <section ref={cartRef} className="scroll-mt-4">
+              <SectionTitle number={2} hint="Uno detrás de otro, con el mismo barbero">Tu pedido</SectionTitle>
+              <div className="rounded-2xl border border-gold/25 bg-gold/[0.05] p-4">
+                <ul className="space-y-2">
+                  {items.map(({ service, qty }) => (
+                    <li key={service.id} className="flex items-center gap-3 text-sm">
+                      <span className="font-mono font-bold text-gold w-8 shrink-0">{qty} ×</span>
+                      <span className="flex-1 min-w-0 text-white truncate">{service.name}</span>
+                      <span className="font-mono text-zinc-300 shrink-0">{formatCOP(qty * service.price)}</span>
+                      <button
+                        type="button"
+                        onClick={() => changeService(service, -qty)}
+                        aria-label={`Quitar ${service.name} del pedido`}
+                        className="w-7 h-7 rounded-full text-zinc-500 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center shrink-0"
+                      >
+                        <X size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-t border-white/10 mt-3 pt-3 flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-zinc-400 text-xs">{units} {units === 1 ? 'servicio' : 'servicios'} · {duration} min en total</p>
+                    {units >= MAX_CART_UNITS && <p className="text-amber-400 text-[11px] mt-0.5">Máximo {MAX_CART_UNITS} servicios por reserva.</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-zinc-500 text-[11px] uppercase tracking-wider">Total</p>
+                    <p className="font-mono text-xl font-bold gold-text">{formatCOP(total)}</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-zinc-500 text-xs mt-2">
-                {turns === 1
-                  ? '¿Vienes con alguien más (tu hijo, un amigo)? Reserva varios turnos seguidos.'
-                  : `${turns} turnos de ${value.service.name} · ${turns * value.service.duration} min en total · ${formatCOP(turns * value.service.price)}`}
-              </p>
+              <button
+                type="button"
+                onClick={() => scrollTo(dayRef)}
+                className="mt-3 w-full py-2.5 rounded-full border border-gold/40 text-gold text-sm font-semibold hover:bg-gold/10 transition-colors"
+              >
+                Listo, elegir el día
+              </button>
             </section>
 
             <section ref={dayRef} className="scroll-mt-4">
@@ -400,7 +455,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
                       </button>
                     )}
                     {allowAny && value.barber && freeTimes(date, allIds).length > 0 && (
-                      <button onClick={() => update({ barber: null, time: '' })} className="px-3.5 py-2 rounded-full border border-white/15 text-zinc-300 text-xs font-semibold hover:border-gold/40 hover:text-gold">
+                      <button onClick={() => update({ barber: null, date, time: '' })} className="px-3.5 py-2 rounded-full border border-white/15 text-zinc-300 text-xs font-semibold hover:border-gold/40 hover:text-gold">
                         Ver otro barbero este día
                       </button>
                     )}
@@ -419,7 +474,11 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
           className="w-full btn-gold py-3.5 rounded-full font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <span>
-            {!value.service ? 'Elige un servicio' : !value.time ? 'Elige una hora' : `Continuar · ${dayShort(date)} ${dayOfMonth(date)} a las ${value.time}${turns > 1 ? ` · ${turns} turnos` : ''}`}
+            {!hasItems
+              ? 'Elige uno o varios servicios'
+              : !value.time
+                ? `Elige una hora · ${units} ${units === 1 ? 'servicio' : 'servicios'} · ${formatCOP(total)}`
+                : `Continuar · ${dayShort(date)} ${dayOfMonth(date)} a las ${value.time} · ${formatCOP(total)}`}
           </span>
         </button>
       </div>

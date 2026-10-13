@@ -8,17 +8,15 @@ import { ticketCode } from '../../lib/ticket';
 export interface TicketData {
   bookingId: string;
   clientName: string;
-  serviceName: string;
-  duration: number;
+  /** Servicios reservados con su cantidad y el precio de esa línea */
+  items: { name: string; qty: number; price: number }[];
   barberName: string;
   date: string;
   time: string;
-  /** Precio total (de todos los turnos) */
+  /** Precio total del pedido */
   price: number;
-  /** Turnos seguidos reservados; 1 si no se indica */
-  turns?: number;
-  /** Hora en que termina el último turno */
-  endTime?: string;
+  /** Hora en que termina el último servicio */
+  endTime: string;
 }
 
 interface Props {
@@ -40,14 +38,16 @@ export default function BookingTicket({ ticket, onClose }: Props) {
   const [actionError, setActionError] = useState('');
   const code = ticketCode(ticket.bookingId);
   const dateText = formatDateLong(ticket.date);
+  const several = ticket.items.reduce((n, i) => n + i.qty, 0) > 1;
+  const hourText = several ? `${ticket.time} a ${ticket.endTime}` : ticket.time;
 
   const summary = [
     `✂️ *${businessConfig.name}* — Reserva confirmada`,
     `Código: ${code}`,
-    `Servicio: ${ticket.serviceName}`,
+    `Servicios: ${ticket.items.map((i) => `${i.qty} × ${i.name}`).join(', ')}`,
     `Barbero: ${ticket.barberName}`,
     `Fecha: ${dateText}`,
-    `Hora: ${ticket.time}${(ticket.turns ?? 1) > 1 ? ` a ${ticket.endTime} (${ticket.turns} turnos)` : ""}`,
+    `Hora: ${hourText}`,
     `Total: ${formatCOP(ticket.price)} (pago en la barbería)`,
     `📍 ${businessConfig.address.trim()}`,
   ].join('\n');
@@ -122,10 +122,10 @@ export default function BookingTicket({ ticket, onClose }: Props) {
 
   const rows = [
     ['Cliente', ticket.clientName],
-    ['Servicio', `${ticket.serviceName} · ${ticket.duration} min${(ticket.turns ?? 1) > 1 ? ` × ${ticket.turns} turnos` : ''}`],
+    ...ticket.items.map((i, n) => [n === 0 ? (several ? 'Servicios' : 'Servicio') : '', `${i.qty} × ${i.name}`]),
     ['Barbero', ticket.barberName],
     ['Fecha', dateText],
-    ['Hora', (ticket.turns ?? 1) > 1 ? `${ticket.time} a ${ticket.endTime}` : ticket.time],
+    ['Hora', hourText],
   ];
 
   return (

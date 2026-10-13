@@ -8,6 +8,7 @@ import AppointmentStep, { type Appointment } from './AppointmentStep';
 import DetailsStep from './DetailsStep';
 import BookingTicket, { type TicketData } from './BookingTicket';
 import { timeToMinutes, minutesToTime } from '../../lib/dates';
+import { cartSchedule, cartDuration, cartPrice } from '../../lib/bookingCart';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -46,7 +47,12 @@ function notifyWhatsApp(payload: { bookingId: string }) {
     .catch((err) => console.warn('No se pudo enviar el WhatsApp de la reserva', err));
 }
 
-const emptyAppointment = (service: Service | null = null): Appointment => ({ service, barber: null, date: '', time: '', turns: 1 });
+const emptyAppointment = (service: Service | null = null): Appointment => ({
+  items: service ? [{ service, qty: 1 }] : [],
+  barber: null,
+  date: '',
+  time: '',
+});
 
 export default function BookingModal({ isOpen, onClose, preselectedService }: BookingModalProps) {
   const [step, setStep] = useState<Step>('cita');
@@ -80,21 +86,21 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
-    const { service, barber, date, time } = appointment;
-    if (!service) return;
-    const turns = appointment.turns || 1;
+    const { items, barber, date, time } = appointment;
+    if (items.length === 0) return;
+    const schedule = cartSchedule(items, time);
     setLoading(true);
     setError('');
     const created: { bookingId: string; barberName: string }[] = [];
     try {
-      // Cada turno es una cita, uno detrás de otro y con el mismo barbero
+      // Cada servicio es una cita, uno detrás de otro y con el mismo barbero
       let barberId = barber?.id ?? '';
-      for (let i = 0; i < turns; i++) {
+      for (let i = 0; i < schedule.length; i++) {
         const booking = await createBooking({
-          serviceId: service.id,
+          serviceId: schedule[i].service.id,
           barberId,
           date,
-          time: minutesToTime(timeToMinutes(time) + i * service.duration),
+          time: schedule[i].time,
           clientName: i === 0 ? contact.name.trim() : `${contact.name.trim()} (turno ${i + 1})`,
           clientPhone: contact.phone.trim(),
         });
@@ -105,14 +111,12 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
       setTicket({
         bookingId: created[0].bookingId,
         clientName: contact.name.trim(),
-        serviceName: service.name,
-        duration: service.duration,
+        items: items.map(({ service, qty }) => ({ name: service.name, qty, price: service.price * qty })),
         barberName: created[0].barberName,
         date,
         time,
-        price: service.price * turns,
-        turns,
-        endTime: minutesToTime(timeToMinutes(time) + turns * service.duration),
+        price: cartPrice(items),
+        endTime: minutesToTime(timeToMinutes(time) + cartDuration(items)),
       });
       created.forEach((b) => notifyWhatsApp({ bookingId: b.bookingId }));
     } catch (err) {
@@ -121,11 +125,11 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
       if (created.length > 0) {
         // Alcanzaron a quedar algunos turnos: se avisa cuáles para que no reserve dos veces
         created.forEach((b) => notifyWhatsApp({ bookingId: b.bookingId }));
-        setError(`Se reservaron ${created.length} de ${turns} turnos (desde las ${time}). El siguiente ya no estaba libre: escríbenos por WhatsApp y te ayudamos.`);
+        setError(`Se reservaron ${created.length} de ${schedule.length} servicios (desde las ${time}). El siguiente ya no estaba libre: escríbenos por WhatsApp y te ayudamos.`);
       } else {
         setError(ERROR_MESSAGES[code]);
         if (BACK_TO_APPOINTMENT.includes(code)) {
-          setAppointment((prev) => ({ ...prev, time: '', ...(code === 'SERVICE_NOT_FOUND' ? { service: null } : {}) }));
+          setAppointment((prev) => ({ ...prev, time: '', ...(code === 'SERVICE_NOT_FOUND' ? { items: [] } : {}) }));
           setStep('cita');
         }
       }
