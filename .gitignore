@@ -11,3 +11,6 @@ supabase/snippets/
 # Datos personales: nunca al repositorio
 *.csv
 datos-privados/
+
+.vercel
+.env*
