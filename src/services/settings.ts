@@ -8,8 +8,16 @@ import type { BusinessConfig, BusinessHours, SpecialDay } from '../types';
 
 export type EditableSettings = Pick<
   BusinessConfig,
-  'tagline' | 'address' | 'phone' | 'whatsapp' | 'email' | 'instagram' | 'tiktok' | 'facebook' | 'hours' | 'holidayHours' | 'specialDays' | 'allowAnyBarber'
+  'tagline' | 'address' | 'phone' | 'whatsapp' | 'email' | 'instagram' | 'tiktok' | 'facebook' | 'hours' | 'holidayHours' | 'specialDays' | 'allowAnyBarber' | 'slotStep' | 'daysAhead'
 >;
+
+/** Opciones de «las citas empiezan cada…» (minutos) */
+export const SLOT_STEP_OPTIONS = [10, 15, 20, 30, 40, 45, 60] as const;
+/** Opciones de anticipación (días). El servidor no acepta reservas a más de 30 días. */
+export const DAYS_AHEAD_OPTIONS = [3, 7, 14, 21, 30] as const;
+
+const validSlotStep = (n: unknown): n is number => (SLOT_STEP_OPTIONS as readonly unknown[]).includes(n);
+const validDaysAhead = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 30;
 
 const TEXT_KEYS = ['tagline', 'address', 'phone', 'whatsapp', 'email', 'instagram', 'tiktok', 'facebook'] as const;
 const TIME_RE = /^\d{2}:\d{2}$/;
@@ -38,6 +46,8 @@ function apply(data: Partial<EditableSettings>) {
   if (Array.isArray(data.hours) && data.hours.length === 7 && data.hours.every(validHours)) businessConfig.hours = data.hours;
   if (validHours(data.holidayHours)) businessConfig.holidayHours = data.holidayHours;
   if (typeof data.allowAnyBarber === 'boolean') businessConfig.allowAnyBarber = data.allowAnyBarber;
+  if (validSlotStep(data.slotStep)) businessConfig.slotStep = data.slotStep;
+  if (validDaysAhead(data.daysAhead)) businessConfig.daysAhead = data.daysAhead;
   if (Array.isArray(data.specialDays) && data.specialDays.every(validSpecialDay)) {
     businessConfig.specialDays = [...data.specialDays].sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -55,8 +65,8 @@ export async function loadSettings(): Promise<void> {
 }
 
 export function currentSettings(): EditableSettings {
-  const { tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber } = businessConfig;
-  return structuredClone({ tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber });
+  const { tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead } = businessConfig;
+  return structuredClone({ tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead });
 }
 
 /** Guarda los cambios (solo administradores) y los aplica de inmediato en esta pestaña. */
@@ -64,6 +74,7 @@ export async function saveSettings(patch: Partial<EditableSettings>): Promise<vo
   const next = { ...currentSettings(), ...patch };
   if (!next.hours.every(validHours) || !validHours(next.holidayHours)) throw new Error('INVALID_HOURS');
   if (!next.specialDays.every(validSpecialDay)) throw new Error('INVALID_SPECIAL_DAY');
+  if (!validSlotStep(next.slotStep) || !validDaysAhead(next.daysAhead)) throw new Error('INVALID_RULES');
   const { error } = await supabase
     .from('business_settings')
     .upsert({ id: true, data: next, updated_at: new Date().toISOString() });

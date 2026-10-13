@@ -1,9 +1,10 @@
 import type { BusySlot } from '../services/bookings';
 import { todayKey, nowMinutes, timeToMinutes, minutesToTime } from './dates';
 import { bookingHoursFor } from './businessHours';
+import { businessConfig } from '../config/business';
 
-// Cada cuánto empieza una cita. El horario de cada día sale de businessConfig.hours.
-export const SLOT_STEP = 30;
+// Cada cuánto empieza una cita (businessConfig.slotStep, editable en Panel → Configuración → Reglas).
+// El horario de cada día sale de businessConfig.hours.
 
 export function isBarberFree(busy: BusySlot[], barberId: string, start: number, duration: number): boolean {
   const end = start + duration;
@@ -31,7 +32,7 @@ export function generateSlots(
   const isToday = date === todayKey();
   const now = nowMinutes();
   const slots = [];
-  for (let start = hours.open; start + duration <= hours.close; start += SLOT_STEP) {
+  for (let start = hours.open; start + duration <= hours.close; start += businessConfig.slotStep) {
     const isPast = isToday && start <= now;
     const someoneFree = barberIds.some((id) => isBarberFree(busy, id, start, duration));
     slots.push({ time: minutesToTime(start), available: !isPast && someoneFree });

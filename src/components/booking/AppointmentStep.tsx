@@ -29,7 +29,6 @@ interface Props {
   onContinue: () => void;
 }
 
-const DAYS_AHEAD = 14;
 
 function SectionTitle({ number, children, hint }: { number: number; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
@@ -60,7 +59,8 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
   const barberRef = useRef<HTMLElement>(null);
   const timeRef = useRef<HTMLElement>(null);
 
-  const dates = Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(todayKey(), i));
+  // Días que se pueden reservar (businessConfig.daysAhead, editable en Panel → Configuración → Reglas)
+  const dates = Array.from({ length: businessConfig.daysAhead }, (_, i) => addDays(todayKey(), i));
 
   useEffect(() => {
     Promise.all([getServices(), getBarbers()])
@@ -88,9 +88,9 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
       });
   }, []);
 
-  // Al abrir: la disponibilidad de los 14 días
+  // Al abrir: la disponibilidad de todos los días que se pueden reservar
   useEffect(() => {
-    loadBusy(Array.from({ length: DAYS_AHEAD }, (_, i) => addDays(todayKey(), i))).finally(() => setLoadingBusy(false));
+    loadBusy(Array.from({ length: businessConfig.daysAhead }, (_, i) => addDays(todayKey(), i))).finally(() => setLoadingBusy(false));
   }, [loadBusy]);
 
   const items = value.items;

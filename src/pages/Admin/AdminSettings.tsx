@@ -3,10 +3,9 @@ import {
   Store, Clock, CalendarX, ShieldCheck, ListChecks, Save, Loader2, CheckCircle2, AlertCircle, Trash2, Plus,
   Eye, EyeOff, KeyRound, Users, Megaphone, MessageCircle,
 } from 'lucide-react';
-import { currentSettings, saveSettings, type EditableSettings } from '../../services/settings';
+import { currentSettings, saveSettings, SLOT_STEP_OPTIONS, DAYS_AHEAD_OPTIONS, type EditableSettings } from '../../services/settings';
 import { changeAdminPassword, currentAdminEmail, AdminAuthError } from '../../services/adminAuth';
 import { getBarbers, updateBarber } from '../../services/barbers';
-import { SLOT_STEP } from '../../lib/availability';
 import { noticeStart } from '../../lib/businessHours';
 import { upcomingHolidays } from '../../lib/holidays';
 import { todayKey, addDays, formatDateLong } from '../../lib/dates';
@@ -494,13 +493,93 @@ function AnyBarberCard() {
   );
 }
 
+function ChoiceRow({ label, hint, options, value, onChange, format }: {
+  label: string;
+  hint: string;
+  options: readonly number[];
+  value: number;
+  onChange: (n: number) => void;
+  format: (n: number) => string;
+}) {
+  return (
+    <div>
+      <p className="text-white text-sm font-medium">{label}</p>
+      <p className="text-zinc-500 text-xs mb-2.5">{hint}</p>
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={label}>
+        {options.map((n) => (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={value === n}
+            onClick={() => onChange(n)}
+            className={`px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all ${
+              value === n ? 'border-gold bg-gold/15 text-gold' : 'border-white/10 bg-white/[0.03] text-zinc-300 hover:border-gold/40'
+            }`}
+          >
+            {format(n)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BookingRulesCard() {
+  const [form, setForm] = useState(() => {
+    const { slotStep, daysAhead } = currentSettings();
+    return { slotStep, daysAhead };
+  });
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<Status>(null);
+
+  const save = async () => {
+    setSaving(true);
+    setStatus(null);
+    try {
+      await saveSettings(form);
+      setStatus({ kind: 'ok', text: 'Reglas guardadas. Las reservas nuevas ya las usan.' });
+    } catch (err) {
+      console.error('No se pudieron guardar las reglas', err);
+      setStatus({ kind: 'error', text: 'No se pudo guardar. Intenta de nuevo.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Panel title="Horas y anticipación" subtitle="Cómo se ofrecen las horas al reservar por la web">
+      <div className="space-y-5">
+        <ChoiceRow
+          label="Las citas empiezan cada"
+          hint={`Con ${form.slotStep} minutos se ofrecen horas como 09:00, ${minutesLabel(9 * 60 + form.slotStep)}, ${minutesLabel(9 * 60 + 2 * form.slotStep)}…`}
+          options={SLOT_STEP_OPTIONS}
+          value={form.slotStep}
+          onChange={(slotStep) => { setForm({ ...form, slotStep }); setStatus(null); }}
+          format={(n) => `${n} min`}
+        />
+        <ChoiceRow
+          label="Se puede reservar con anticipación de hasta"
+          hint="Cuántos días hacia adelante ve el cliente para elegir (máximo 30)."
+          options={DAYS_AHEAD_OPTIONS}
+          value={form.daysAhead}
+          onChange={(daysAhead) => { setForm({ ...form, daysAhead }); setStatus(null); }}
+          format={(n) => `${n} días`}
+        />
+      </div>
+      <SaveBar saving={saving} status={status} onSave={save} label="Guardar reglas" />
+    </Panel>
+  );
+}
+
+const minutesLabel = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
 function RulesTab() {
   return (
     <div className="grid lg:grid-cols-2 gap-5">
+      <BookingRulesCard />
       <AnyBarberCard />
       <Panel title="Reglas de reserva" subtitle="Funcionan automáticamente">
-        <Row label="Las citas empiezan cada" value={`${SLOT_STEP} minutos`} />
-        <Row label="Se puede reservar con anticipación de hasta" value="14 días" />
         <Row label="El servicio debe terminar antes del cierre" value="Sí" />
         <Row label="Citas que se cruzan con otra del mismo profesional" value="No se permiten" />
         <Row label="Servicios de manicura" value="Solo con manicurista" />

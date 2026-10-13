@@ -35,6 +35,9 @@ export const businessConfig: BusinessConfig = {
   //   'closed':  no se trabaja
   // «El primero que esté libre» al reservar (se apaga en Panel → Configuración → Reglas)
   allowAnyBarber: true,
+  // Reglas de reserva (se cambian en Panel → Configuración → Reglas)
+  slotStep: 30,
+  daysAhead: 14,
   specialDays: [
     { date: '2026-12-01', type: 'closed', noticeFrom: '2026-11-30' },
     { date: '2026-12-06', type: 'walk-in', noticeFrom: '2026-11-30' },
