@@ -5,7 +5,7 @@
 // vez y solo durante los primeros 15 minutos después de creada.
 //
 // Variables de entorno en Vercel:
-//   SUPABASE_URL (o VITE_SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY
+//   VITE_SUPABASE_URL (o APP_SUPABASE_URL), APP_SUPABASE_SERVICE_ROLE_KEY (llave service_role de ese proyecto)
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_TO
 
 // SIDs de las plantillas aprobadas por WhatsApp
@@ -26,8 +26,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'bookingId inválido' });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // La misma base de datos que usa la web (VITE_SUPABASE_URL). Las variables SUPABASE_* las maneja
+  // la integración de Vercel y pueden apuntar a otro proyecto, por eso van de último recurso.
+  const supabaseUrl = process.env.APP_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const serviceKey = process.env.APP_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const from = process.env.TWILIO_WHATSAPP_FROM;
