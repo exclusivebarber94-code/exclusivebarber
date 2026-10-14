@@ -38,6 +38,8 @@ const INTENTS = {
   pago: ['pago', 'pagar', 'tarjeta', 'nequi', 'daviplata', 'efectivo', 'transferencia', 'anticipo', 'abono'],
   cancelar: ['cancel', 'cambiar la cita', 'cambiar mi cita', 'mover la cita', 'reprogram', 'no puedo ir', 'llegar tarde'],
   humano: ['persona', 'humano', 'asesor', 'hablar con alguien', 'dueno', 'administrador', 'encargado'],
+  // Temas que no están en la base: los responde una persona de la barbería
+  especial: ['domicilio', 'a casa', 'mi casa', 'promo', 'descuento', 'oferta', 'estudiante', 'combo', 'empleo', 'trabajo', 'vacante', 'hoja de vida', 'curso', 'clases', 'aprender', 'evento', 'boda', 'matrimonio', 'grupo', 'nino', 'nina', 'bebe', 'queja', 'reclamo', 'parqueadero', 'parqueo', 'mascota', 'factura', 'garantia', 'bono', 'regalo', 'tarjeta de regalo'],
   productos: ['venden', 'vender', 'producto', 'comprar', 'tienda', 'shop', 'gel', 'shampoo', 'champu', 'aceite', 'pomada', 'cera para', 'locion', 'perfume', 'maquina', 'cuchilla'],
 };
 
@@ -126,6 +128,13 @@ export async function ruleReply({ text: raw, biz, today, availability, hoursFor 
   const parts = [];
   const actions = [];
   const intent = Object.fromEntries(Object.entries(INTENTS).map(([k, words]) => [k, has(text, words)]));
+  // Domicilio, promociones, eventos…: no se adivina, se pasa a la barbería
+  if (intent.especial) {
+    return {
+      reply: 'Eso lo coordina directamente la barbería. 🙌 Toca "Dejar mensaje", escribe tu nombre y celular, y te responden por WhatsApp lo antes posible.',
+      actions: [{ type: 'handoff' }],
+    };
+  }
   const svc = intent.productos ? [] : findServices(text, services);
   const barber = findBarber(text, barbers);
   const date = findDate(text, today.date);
