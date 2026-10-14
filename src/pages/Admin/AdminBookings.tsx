@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Search, Download, ChevronDown, Loader2, MessageCircle, UserPlus, CheckCircle2, Trash2 } from 'lucide-react';
+import { Search, Download, ChevronDown, Loader2, MessageCircle, UserPlus, CheckCircle2, Trash2, CalendarCheck, X } from 'lucide-react';
 import { getBookings, updateBookingStatus, deleteBooking } from '../../services/bookings';
 import { formatCOP } from '../../data';
-import { dayOfMonth, monthShort, dayShort } from '../../lib/dates';
+import { dayOfMonth, monthShort, dayShort, todayKey, formatDateLong } from '../../lib/dates';
 import { STATUS_LABEL, type BookingStatus } from '../../lib/stats';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import type { Booking } from '../../types';
@@ -23,6 +23,8 @@ function toCSV(rows: (string | number)[][]): string {
 export default function AdminBookings() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'todos'>('todos');
+  // «Hoy»: solo las citas del día de hoy (hora de Colombia)
+  const [onlyToday, setOnlyToday] = useState(false);
   const [list, setList] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,9 +53,11 @@ export default function AdminBookings() {
     b.serviceName.toLowerCase().includes(query) ||
     b.barberName.toLowerCase().includes(query) ||
     (digits.length >= 3 && b.clientPhone.replace(/\D/g, '').includes(digits));
-  // De la última reserva (fecha y hora más tardía) a la primera
+  const today = todayKey();
+  const todayCount = list.filter((b) => b.date === today && b.status !== 'cancelled').length;
+  // De la última reserva (fecha y hora más tardía) a la primera; con «Hoy», solo las de hoy
   const searched = list
-    .filter(matchesSearch)
+    .filter((b) => matchesSearch(b) && (!onlyToday || b.date === today))
     .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time) || b.createdAt.localeCompare(a.createdAt));
   const filtered = searched.filter((b) => statusFilter === 'todos' || b.status === statusFilter);
   const counts = new Map<string, number>(STATUSES.map((s) => [s, searched.filter((b) => b.status === s).length]));
@@ -239,13 +243,28 @@ export default function AdminBookings() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+        <button
+          type="button"
+          onClick={() => setOnlyToday(!onlyToday)}
+          aria-pressed={onlyToday}
+          title="Ver solo las reservas de hoy"
+          className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all ${
+            onlyToday ? 'bg-emerald-500 text-white border-emerald-500' : 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10'
+          }`}
+        >
+          <CalendarCheck size={14} />
+          Hoy
+          <span className={`font-mono text-[10px] px-1.5 rounded-full ${onlyToday ? 'bg-black/15' : 'bg-emerald-500/15'}`}>{todayCount}</span>
+          {onlyToday && <X size={12} aria-label="Quitar filtro de hoy" />}
+        </button>
+        <span className="shrink-0 w-px bg-white/10 my-1" aria-hidden="true" />
         {chip('todos', 'Todas', searched.length)}
         {STATUSES.map((s) => chip(s, STATUS_LABEL[s], counts.get(s) ?? 0))}
       </div>
 
       <Panel
-        title="Registro de citas"
-        subtitle="Cambia el estado de cada cita a medida que avanza el día"
+        title={onlyToday ? 'Reservas de hoy' : 'Registro de citas'}
+        subtitle={onlyToday ? formatDateLong(today) : 'Cambia el estado de cada cita a medida que avanza el día'}
         action={<span className="text-[11px] font-mono text-zinc-400 bg-white/[0.04] border border-white/10 px-3 py-1 rounded-full">{filtered.length} {filtered.length === 1 ? 'reserva' : 'reservas'}</span>}
         bodyClassName="pt-4"
       >
@@ -260,8 +279,8 @@ export default function AdminBookings() {
             columns={columns}
             rowKey={(b) => b.id}
             pageSize={25}
-            resetKey={`${search}|${statusFilter}`}
-            empty="No se encontraron reservas con estos filtros."
+            resetKey={`${search}|${statusFilter}|${onlyToday}`}
+            empty={onlyToday ? 'Hoy no hay reservas con estos filtros.' : 'No se encontraron reservas con estos filtros.'}
             rowClassName={(b) => (b.status === 'cancelled' ? 'opacity-60' : '')}
           />
         )}
