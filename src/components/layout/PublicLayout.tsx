@@ -36,7 +36,7 @@ export default function PublicLayout({ children }: Props) {
       </div>
 
       <SocialFloat />
-      <WhatsAppChat />
+      <WhatsAppChat onBooking={() => openBooking()} />
 
       <BookingModal
         isOpen={bookingOpen}

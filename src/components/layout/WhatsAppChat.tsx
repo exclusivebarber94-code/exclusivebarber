@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, Loader2, CheckCheck } from 'lucide-react';
+import { X, Send, Loader2, CheckCheck, CalendarPlus, RotateCcw, Sparkles } from 'lucide-react';
 import { businessConfig } from '../../config/business';
 import { sendContactMessage, ContactMessageSendError, type ContactMessageError } from '../../services/contactMessages';
+import { askAssistant, AssistantError, type AssistantAction, type ChatTurn } from '../../services/assistant';
 import { loadClientContact, saveClientContact } from '../../lib/clientContact';
 
-// Botón flotante de WhatsApp con chat: el visitante escribe y envía desde la web, sin abrir WhatsApp.
-// El mensaje llega a Panel -> Mensajes y la barbería le responde por WhatsApp.
-
-
+// Chat flotante de la web con asistente (IA): responde precios, horarios, ubicación y cupos al instante
+// y lleva a reservar. Lo que no sabe lo deja en Panel → Mensajes para que la barbería responda por WhatsApp.
+// Si el asistente no está disponible, el chat pasa al modo anterior: el cliente deja su mensaje.
 
 function WhatsAppIcon({ className = '' }: { className?: string }) {
   return (
@@ -25,21 +25,47 @@ const ERRORS: Record<ContactMessageError, string> = {
   UNKNOWN: 'No se pudo enviar. Revisa tu conexión o escríbenos directo por WhatsApp.',
 };
 
-interface SentMessage {
-  text: string;
-  time: string;
+const SUGGESTIONS = ['¿Cuánto cuesta un corte?', '¿Hay cupo hoy?', '¿Dónde quedan?', '¿Qué horario tienen?'];
+const STORAGE_KEY = 'eb-chat';
+
+interface ChatItem extends ChatTurn {
+  actions?: AssistantAction[];
+  /** Respuesta de error local (no se envía al asistente como historial) */
+  local?: boolean;
+  time?: string;
 }
 
-export default function WhatsAppChat() {
+const clock = () => new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+function loadConversation(): ChatItem[] {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as ChatItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+interface Props {
+  /** Abre la ventana de reserva */
+  onBooking?: () => void;
+}
+
+export default function WhatsAppChat({ onBooking }: Props) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'ai' | 'form'>('ai');
+  const [items, setItems] = useState<ChatItem[]>(loadConversation);
   const [contact, setContact] = useState(loadClientContact);
   const [editingContact, setEditingContact] = useState(() => !loadClientContact().name);
   const [message, setMessage] = useState('');
-  const [sent, setSent] = useState<SentMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-40))); } catch { /* sin almacenamiento: no pasa nada */ }
+  }, [items]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,23 +80,53 @@ export default function WhatsAppChat() {
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
-  }, [sent, open]);
+  }, [items, open, sending]);
 
+  // ---------------- modo asistente
+  const askAI = async (text: string) => {
+    const question = text.trim();
+    if (!question || sending) return;
+    const next: ChatItem[] = [...items, { role: 'user', content: question, time: clock() }];
+    setItems(next);
+    setMessage('');
+    setError('');
+    setSending(true);
+    try {
+      const history = next.filter((i) => !i.local).map(({ role, content }) => ({ role, content }));
+      const { reply, actions } = await askAssistant(history);
+      setItems((prev) => [...prev, { role: 'assistant', content: reply, actions, time: clock() }]);
+    } catch (err) {
+      console.error('El asistente no respondió', err);
+      if (err instanceof AssistantError && err.unavailable) {
+        // Sin asistente: se guarda la pregunta para enviarla como mensaje a la barbería
+        setMode('form');
+        setMessage(question);
+        setItems((prev) => prev.slice(0, -1));
+      } else {
+        setItems((prev) => [...prev, { role: 'assistant', local: true, content: err instanceof Error ? err.message : 'No pude responder. Intenta de nuevo.' }]);
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ---------------- modo mensaje (sin asistente)
   const phoneDigits = contact.phone.replace(/\D/g, '');
-  const canSend = contact.name.trim().length >= 2 && phoneDigits.length >= 10 && message.trim().length > 0 && !sending;
+  const canSendForm = contact.name.trim().length >= 2 && phoneDigits.length >= 10 && message.trim().length > 0 && !sending;
 
-  const handleSend = async () => {
-    if (!canSend) return;
+  const sendForm = async () => {
+    if (!canSendForm) return;
     setSending(true);
     setError('');
     const text = message.trim();
     try {
       await sendContactMessage(contact.name.trim(), contact.phone.trim(), text);
       saveClientContact(contact);
-      setSent((prev) => [...prev, {
-        text,
-        time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-      }]);
+      setItems((prev) => [
+        ...prev,
+        { role: 'user', content: text, time: clock(), local: true },
+        { role: 'assistant', local: true, content: `¡Recibido, ${contact.name.split(' ')[0]}! Te escribiremos al WhatsApp ${contact.phone}. ¿Algo más?` },
+      ]);
       setMessage('');
       setEditingContact(false);
     } catch (err) {
@@ -81,7 +137,12 @@ export default function WhatsAppChat() {
     }
   };
 
+  const submit = () => (mode === 'ai' ? askAI(message) : sendForm());
+  const canSubmit = mode === 'ai' ? message.trim().length > 0 && !sending : canSendForm;
+  const reset = () => { setItems([]); setError(''); setMode('ai'); };
+
   const whatsappLink = `https://wa.me/${businessConfig.whatsapp}?text=${encodeURIComponent(message.trim() || 'Hola, quiero información sobre sus servicios.')}`;
+  const hasUserMessages = items.some((i) => i.role === 'user');
 
   return (
     <div className="fixed bottom-5 right-5 z-[90] flex flex-col items-end gap-3">
@@ -90,7 +151,7 @@ export default function WhatsAppChat() {
           role="dialog"
           aria-label="Chat con Exclusive Barber"
           className="w-[calc(100vw-2.5rem)] max-w-sm rounded-2xl overflow-hidden border border-gold/30 shadow-2xl bg-[#111] flex flex-col animate-slide-up"
-          style={{ maxHeight: 'min(560px, calc(100vh - 7rem))' }}
+          style={{ height: 'min(600px, calc(100vh - 7rem))' }}
         >
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-gold-500 to-gold-400 text-dark">
             <div className="w-10 h-10 rounded-full bg-dark flex items-center justify-center shrink-0">
@@ -99,41 +160,73 @@ export default function WhatsAppChat() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold leading-tight">{businessConfig.name}</p>
               <p className="text-xs opacity-80 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-700" /> Te respondemos por WhatsApp
+                {mode === 'ai'
+                  ? <><Sparkles size={11} /> Asistente virtual · responde al instante</>
+                  : <><span className="w-1.5 h-1.5 rounded-full bg-green-700" /> Te respondemos por WhatsApp</>}
               </p>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Cerrar chat"
-              className="w-9 h-9 rounded-full hover:bg-black/10 flex items-center justify-center"
-            >
+            {hasUserMessages && (
+              <button onClick={reset} aria-label="Empezar de nuevo" title="Empezar de nuevo" className="w-9 h-9 rounded-full hover:bg-black/10 flex items-center justify-center">
+                <RotateCcw size={16} />
+              </button>
+            )}
+            <button onClick={() => setOpen(false)} aria-label="Cerrar chat" className="w-9 h-9 rounded-full hover:bg-black/10 flex items-center justify-center">
               <X size={18} />
             </button>
           </div>
 
-          <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[#0b0b0b]">
+          <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-[#0b0b0b]" aria-live="polite">
             <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white/8 border border-white/10 px-3.5 py-2.5 text-sm text-zinc-200">
-              ¡Hola! 👋 Bienvenido a {businessConfig.name}. Escríbenos tu pregunta y te responderemos por WhatsApp lo antes posible.
+              {mode === 'ai'
+                ? <>¡Hola! 👋 Soy el asistente de {businessConfig.name}. Pregúntame por precios, horarios, cómo llegar o si hay cupo, y te ayudo a reservar.</>
+                : <>¡Hola! 👋 Ahora mismo el asistente no está disponible. Déjanos tu mensaje y te responderemos por WhatsApp lo antes posible.</>}
             </div>
-            {sent.map((m, i) => (
+
+            {items.map((m, i) => m.role === 'user' ? (
               <div key={i} className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-gold/90 text-dark px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words">
-                  {m.text}
-                  <span className="flex items-center justify-end gap-1 text-[10px] opacity-70 mt-1">
-                    {m.time} <CheckCheck size={12} />
-                  </span>
+                  {m.content}
+                  {m.time && <span className="flex items-center justify-end gap-1 text-[10px] opacity-70 mt-1">{m.time} <CheckCheck size={12} /></span>}
                 </div>
               </div>
+            ) : (
+              <div key={i} className="space-y-2">
+                <div className={`max-w-[85%] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm whitespace-pre-wrap break-words ${m.local && mode === 'ai' ? 'bg-red-500/10 border border-red-500/20 text-red-300' : 'bg-white/8 border border-white/10 text-zinc-200'}`}>
+                  {m.content}
+                </div>
+                {m.actions?.some((a) => a.type === 'message_sent') && (
+                  <p className="flex items-center gap-1.5 text-[11px] text-emerald-400"><CheckCheck size={13} /> Mensaje enviado a la barbería</p>
+                )}
+                {m.actions?.some((a) => a.type === 'book') && onBooking && (
+                  <button
+                    onClick={() => { setOpen(false); onBooking(); }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-gold-400 to-gold-500 text-dark text-sm font-semibold hover:brightness-110"
+                  >
+                    <CalendarPlus size={16} /> Reservar ahora
+                  </button>
+                )}
+              </div>
             ))}
-            {sent.length > 0 && (
-              <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white/8 border border-white/10 px-3.5 py-2.5 text-sm text-zinc-200">
-                ¡Recibido, {contact.name.split(' ')[0]}! Te escribiremos al WhatsApp {contact.phone}. ¿Algo más?
+
+            {sending && mode === 'ai' && (
+              <div className="inline-flex items-center gap-1 rounded-2xl rounded-tl-sm bg-white/8 border border-white/10 px-4 py-3" aria-label="Escribiendo">
+                {[0, 1, 2].map((d) => <span key={d} className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: `${d * 150}ms` }} />)}
+              </div>
+            )}
+
+            {mode === 'ai' && !hasUserMessages && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {SUGGESTIONS.map((s) => (
+                  <button key={s} onClick={() => askAI(s)} className="px-3 py-1.5 rounded-full border border-gold/40 text-gold text-xs hover:bg-gold/10">
+                    {s}
+                  </button>
+                ))}
               </div>
             )}
           </div>
 
           <div className="border-t border-white/10 p-3 space-y-2 bg-[#111]">
-            {editingContact ? (
+            {mode === 'form' && (editingContact ? (
               <div className="grid grid-cols-2 gap-2">
                 <input
                   value={contact.name}
@@ -160,7 +253,7 @@ export default function WhatsAppChat() {
                 Como <span className="text-zinc-300">{contact.name}</span> · {contact.phone}{' '}
                 <button onClick={() => setEditingContact(true)} className="text-gold hover:underline">cambiar</button>
               </p>
-            )}
+            ))}
 
             {error && <p className="text-xs text-red-400">{error}</p>}
 
@@ -172,18 +265,18 @@ export default function WhatsAppChat() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSend();
+                    submit();
                   }
                 }}
-                placeholder="Escribe tu mensaje..."
+                placeholder={mode === 'ai' ? 'Escribe tu pregunta...' : 'Escribe tu mensaje...'}
                 aria-label="Mensaje"
                 rows={1}
                 maxLength={1000}
                 className="flex-1 resize-none max-h-28 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-gold/50"
               />
               <button
-                onClick={handleSend}
-                disabled={!canSend}
+                onClick={submit}
+                disabled={!canSubmit}
                 aria-label="Enviar mensaje"
                 className="w-11 h-11 shrink-0 rounded-full bg-gradient-to-br from-gold-300 to-gold-500 text-dark flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
               >
@@ -196,7 +289,7 @@ export default function WhatsAppChat() {
               rel="noopener noreferrer"
               className="block text-center text-[11px] text-zinc-500 hover:text-gold transition-colors"
             >
-              ¿Prefieres abrir WhatsApp? Toca aquí
+              ¿Prefieres hablar con una persona? Escríbenos por WhatsApp
             </a>
           </div>
         </div>
@@ -204,7 +297,7 @@ export default function WhatsAppChat() {
 
       <button
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Cerrar chat de WhatsApp' : 'Abrir chat de WhatsApp'}
+        aria-label={open ? 'Cerrar chat' : 'Abrir chat con el asistente'}
         aria-expanded={open}
         className="relative w-14 h-14 rounded-full bg-gradient-to-br from-gold-300 via-gold-400 to-gold-600 text-white shadow-gold-lg flex items-center justify-center hover:scale-105 transition-transform"
       >
