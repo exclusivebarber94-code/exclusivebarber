@@ -51,7 +51,10 @@ export default function AdminBookings() {
     b.serviceName.toLowerCase().includes(query) ||
     b.barberName.toLowerCase().includes(query) ||
     (digits.length >= 3 && b.clientPhone.replace(/\D/g, '').includes(digits));
-  const searched = list.filter(matchesSearch);
+  // De la última reserva (fecha y hora más tardía) a la primera
+  const searched = list
+    .filter(matchesSearch)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time) || b.createdAt.localeCompare(a.createdAt));
   const filtered = searched.filter((b) => statusFilter === 'todos' || b.status === statusFilter);
   const counts = new Map<string, number>(STATUSES.map((s) => [s, searched.filter((b) => b.status === s).length]));
 
