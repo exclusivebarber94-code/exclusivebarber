@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, Loader2, CheckCheck, CalendarPlus, RotateCcw, Sparkles } from 'lucide-react';
+import { X, Send, Loader2, CheckCheck, CalendarPlus, RotateCcw, Sparkles, MessageSquareText, ArrowLeft } from 'lucide-react';
 import { businessConfig } from '../../config/business';
 import { sendContactMessage, ContactMessageSendError, type ContactMessageError } from '../../services/contactMessages';
 import { askAssistant, AssistantError, type AssistantAction, type ChatTurn } from '../../services/assistant';
@@ -54,6 +54,8 @@ interface Props {
 export default function WhatsAppChat({ onBooking }: Props) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'ai' | 'form'>('ai');
+  // true si se pasó a «dejar mensaje» porque el asistente no respondió (no porque el cliente lo eligió)
+  const [assistantDown, setAssistantDown] = useState(false);
   const [items, setItems] = useState<ChatItem[]>(loadConversation);
   const [contact, setContact] = useState(loadClientContact);
   const [editingContact, setEditingContact] = useState(() => !loadClientContact().name);
@@ -100,6 +102,7 @@ export default function WhatsAppChat({ onBooking }: Props) {
       if (err instanceof AssistantError && err.unavailable) {
         // Sin asistente: se guarda la pregunta para enviarla como mensaje a la barbería
         setMode('form');
+        setAssistantDown(true);
         setMessage(question);
         setItems((prev) => prev.slice(0, -1));
       } else {
@@ -139,7 +142,15 @@ export default function WhatsAppChat({ onBooking }: Props) {
 
   const submit = () => (mode === 'ai' ? askAI(message) : sendForm());
   const canSubmit = mode === 'ai' ? message.trim().length > 0 && !sending : canSendForm;
-  const reset = () => { setItems([]); setError(''); setMode('ai'); };
+  const reset = () => { setItems([]); setError(''); setMode('ai'); setAssistantDown(false); };
+
+  // Pasar a «dejar mensaje» con la última pregunta del cliente ya escrita
+  const startHandoff = () => {
+    const lastQuestion = [...items].reverse().find((i) => i.role === 'user')?.content ?? '';
+    setMode('form');
+    setMessage((m) => m || lastQuestion);
+    setEditingContact(!contact.name || contact.phone.replace(/\D/g, '').length < 10);
+  };
 
   const whatsappLink = `https://wa.me/${businessConfig.whatsapp}?text=${encodeURIComponent(message.trim() || 'Hola, quiero información sobre sus servicios.')}`;
   const hasUserMessages = items.some((i) => i.role === 'user');
@@ -179,7 +190,9 @@ export default function WhatsAppChat({ onBooking }: Props) {
             <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white/8 border border-white/10 px-3.5 py-2.5 text-sm text-zinc-200">
               {mode === 'ai'
                 ? <>¡Hola! 👋 Soy el asistente de {businessConfig.name}. Pregúntame por precios, horarios, cómo llegar o si hay cupo, y te ayudo a reservar.</>
-                : <>¡Hola! 👋 Ahora mismo el asistente no está disponible. Déjanos tu mensaje y te responderemos por WhatsApp lo antes posible.</>}
+                : assistantDown
+                  ? <>¡Hola! 👋 Ahora mismo el asistente no está disponible. Déjanos tu mensaje y te responderemos por WhatsApp lo antes posible.</>
+                  : <>Déjanos tu nombre, tu celular y tu mensaje: la barbería te responde por WhatsApp lo antes posible.</>}
             </div>
 
             {items.map((m, i) => m.role === 'user' ? (
@@ -196,6 +209,14 @@ export default function WhatsAppChat({ onBooking }: Props) {
                 </div>
                 {m.actions?.some((a) => a.type === 'message_sent') && (
                   <p className="flex items-center gap-1.5 text-[11px] text-emerald-400"><CheckCheck size={13} /> Mensaje enviado a la barbería</p>
+                )}
+                {m.actions?.some((a) => a.type === 'handoff') && mode === 'ai' && i === items.length - 1 && (
+                  <button
+                    onClick={startHandoff}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gold/50 text-gold text-sm font-semibold hover:bg-gold/10 mr-2"
+                  >
+                    <MessageSquareText size={16} /> Dejar mensaje a la barbería
+                  </button>
                 )}
                 {m.actions?.some((a) => a.type === 'book') && onBooking && (
                   <button
@@ -255,6 +276,11 @@ export default function WhatsAppChat({ onBooking }: Props) {
               </p>
             ))}
 
+            {mode === 'form' && !assistantDown && (
+              <button onClick={() => { setMode('ai'); setError(''); }} className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-gold">
+                <ArrowLeft size={12} /> Volver al asistente
+              </button>
+            )}
             {error && <p className="text-xs text-red-400">{error}</p>}
 
             <div className="flex items-end gap-2">

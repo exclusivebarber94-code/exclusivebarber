@@ -5,7 +5,8 @@ export interface ChatTurn {
   content: string;
 }
 
-export type AssistantAction = { type: 'book' } | { type: 'message_sent' };
+/** book: botón de reservar · message_sent: ya se dejó el mensaje · handoff: ofrecer dejar mensaje a la barbería */
+export type AssistantAction = { type: 'book' } | { type: 'message_sent' } | { type: 'handoff' };
 
 export interface AssistantReply {
   reply: string;

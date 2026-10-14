@@ -1,5 +1,6 @@
-// Asistente del chat de la web (Claude). Responde precios, horarios, ubicación y cupos con los datos
-// reales de la base; lleva al cliente a reservar y, si no sabe algo, deja el mensaje en Panel → Mensajes.
+// Asistente del chat de la web. Responde precios, horarios, ubicación y cupos con los datos reales de
+// la base; lleva al cliente a reservar y, si no sabe algo, deja el mensaje en Panel → Mensajes.
+// Sin ANTHROPIC_API_KEY responde por reglas (api/_reglas.js, gratis); con la llave usa Claude.
 //
 // Recibe { messages: [{ role: 'user' | 'assistant', content: string }] } y devuelve
 // { reply: string, actions: [{ type: 'book' } | { type: 'message_sent' }] }.
@@ -9,6 +10,7 @@
 //   VITE_SUPABASE_URL (o APP_SUPABASE_URL), APP_SUPABASE_SERVICE_ROLE_KEY
 
 import Anthropic from '@anthropic-ai/sdk';
+import { ruleReply } from './_reglas.js';
 
 const MODEL = 'claude-opus-5-5';
 const TZ = 'America/Bogota';
@@ -58,12 +60,13 @@ function supabase() {
 }
 
 async function loadBusiness(db) {
-  const [settingsRows, services, barbers] = await Promise.all([
+  const [settingsRows, services, barbers, products] = await Promise.all([
     db.get('business_settings?select=data&limit=1'),
     db.get('services?select=id,name,category,duration,price,description,popular&active=eq.true&order=name'),
     db.get('barbers?select=id,name,short_name,role,available,specialties&order=name'),
+    db.get('products?select=name,brand,price&active=eq.true&order=name').catch(() => []),
   ]);
-  return { settings: settingsRows[0]?.data ?? {}, services, barbers };
+  return { settings: settingsRows[0]?.data ?? {}, services, barbers, products };
 }
 
 /** Datos del negocio para el modelo. Cambia poco: va en el prompt de sistema y se guarda en caché. */
@@ -226,7 +229,6 @@ async function leaveMessage(db, input) {
 // ---------------------------------------------------------------- handler
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'El asistente no está configurado' });
   const db = supabase();
   if (!db.ok) return res.status(503).json({ error: 'El asistente no está configurado' });
 
@@ -244,6 +246,26 @@ export default async function handler(req, res) {
   try {
     const biz = await loadBusiness(db);
     const today = nowInBogota();
+
+    // Sin llave de Claude: asistente por reglas con los datos de la base (gratis)
+    if (!process.env.ANTHROPIC_API_KEY) {
+      const result = await ruleReply({
+        text: history.at(-1).content,
+        biz,
+        today,
+        availability: (input) => availability(db, biz, input),
+        // Horario de un día cualquiera (festivos y días especiales incluidos), sin límite de anticipación
+        hoursFor: async (fecha) => {
+          const [[h], [l]] = await Promise.all([
+            db.rpc('business_hours_for', { p_date: fecha }).then((r) => (Array.isArray(r) ? r : [r])),
+            db.rpc('lunch_break_for', { p_date: fecha }).then((r) => (Array.isArray(r) ? r : [r])),
+          ]);
+          return { status: h.o_status, open: h.o_open, close: h.o_close, lunchStart: l.o_start, lunchEnd: l.o_end };
+        },
+      });
+      return res.status(200).json(result);
+    }
+
     const calendar = Array.from({ length: 8 }, (_, i) => { const d = addDays(today.date, i); return `${i === 0 ? 'hoy' : i === 1 ? 'mañana' : weekdayOf(d)} = ${d}`; }).join(', ');
 
     const client = new Anthropic();
