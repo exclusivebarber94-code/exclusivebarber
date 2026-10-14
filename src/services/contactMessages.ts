@@ -31,14 +31,27 @@ export async function sendContactMessage(name: string, phone: string, message: s
 
 // --- Solo administradores ---------------------------------------------------
 
-export async function getContactMessages(limit = 200): Promise<ContactMessage[]> {
-  const { data, error } = await supabase
-    .from('contact_messages')
-    .select('id, name, phone, message, read, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data as { id: string; name: string; phone: string; message: string; read: boolean; created_at: string }[]).map((r) => ({
+/**
+ * Mensajes del más nuevo al más viejo. Sin `limit` trae todos (Supabase entrega máximo 1000 filas
+ * por consulta, así que se piden por páginas); con `limit`, solo los más recientes (la campanita).
+ */
+export async function getContactMessages(limit?: number): Promise<ContactMessage[]> {
+  type Row = { id: string; name: string; phone: string; message: string; read: boolean; created_at: string };
+  const PAGE = 1000;
+  const rows: Row[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const size = limit ? Math.min(PAGE, limit - from) : PAGE;
+    const { data, error } = await supabase
+      .from('contact_messages')
+      .select('id, name, phone, message, read, created_at')
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, from + size - 1);
+    if (error) throw error;
+    rows.push(...(data as Row[]));
+    if ((data as Row[]).length < size || (limit && rows.length >= limit)) break;
+  }
+  return rows.map((r) => ({
     id: r.id,
     name: r.name,
     phone: r.phone,
