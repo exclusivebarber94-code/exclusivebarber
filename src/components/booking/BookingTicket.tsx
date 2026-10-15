@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2, MapPin, CheckCircle2 } from 'lucide-react';
 import { businessConfig } from '../../config/business';
 import { formatCOP } from '../../data';
@@ -55,11 +55,15 @@ export default function BookingTicket({ ticket, onClose }: Props) {
   const renderImage = async (): Promise<Blob> => {
     const { default: html2canvas } = await import('html2canvas');
     await document.fonts?.ready;
-    const canvas = await html2canvas(ticketRef.current!, {
+    const target = ticketRef.current!;
+    const canvas = await html2canvas(target, {
       backgroundColor: '#0b0b0b',
       scale: 2,
       useCORS: true,
       logging: false,
+      // Solo se copia el ticket (y los contenedores que lo envuelven), no toda la página con su fondo
+      // animado y sus fotos: es lo que más demoraba
+      ignoreElements: (el) => document.body.contains(el) && !el.contains(target) && !target.contains(el),
       // La ventana de reserva tiene scroll: en la copia que se fotografía se quita el recorte
       onclone: (_doc, element) => {
         for (let node = element.parentElement; node; node = node.parentElement) {
@@ -74,6 +78,22 @@ export default function BookingTicket({ ticket, onClose }: Props) {
     );
   };
 
+  // La imagen se prepara una sola vez, en segundo plano apenas aparece el ticket: al tocar
+  // «Enviar a WhatsApp» o «Descargar» ya está lista (y el celular no pierde el permiso de compartir)
+  const imageRef = useRef<Promise<Blob> | null>(null);
+  const getImage = () => {
+    imageRef.current ??= renderImage().catch((err) => {
+      imageRef.current = null; // si falla, se reintenta al tocar
+      throw err;
+    });
+    return imageRef.current;
+  };
+  useEffect(() => {
+    const timer = window.setTimeout(() => { getImage().catch(() => { /* se reintenta al tocar */ }); }, 400);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const downloadBlob = (blob: Blob) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -87,7 +107,7 @@ export default function BookingTicket({ ticket, onClose }: Props) {
     setBusy('download');
     setActionError('');
     try {
-      downloadBlob(await renderImage());
+      downloadBlob(await getImage());
     } catch (err) {
       console.error('No se pudo descargar el ticket', err);
       setActionError('No se pudo crear la imagen del ticket. Puedes tomarle una captura de pantalla.');
@@ -102,7 +122,7 @@ export default function BookingTicket({ ticket, onClose }: Props) {
     setBusy('share');
     setActionError('');
     try {
-      const blob = await renderImage();
+      const blob = await getImage();
       const file = new File([blob], `ticket-${code}.png`, { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: `Reserva ${code}`, text: summary });
