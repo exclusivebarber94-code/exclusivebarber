@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Loader2, Users, Sun, Sunset, CalendarX, Minus, Plus, X, ChevronDown } from 'lucide-react';
+import { Clock, Loader2, Users, Sun, Sunset, CalendarX, Minus, Plus, X, ChevronDown, Sparkles } from 'lucide-react';
 import { getServices } from '../../services/services';
 import { getBarbers } from '../../services/barbers';
 import { getBusySlots, type BusySlot } from '../../services/bookings';
@@ -100,8 +100,10 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
   // Los servicios se atienden uno detrás de otro: se busca un hueco del largo de todos
   const duration = cartDuration(items) || 30;
   const role = cartRole(items) ?? 'barbero';
+  // Servicio más corto: los pedazos libres más cortos que eso no sirven, así que no se dejan
+  const minGap = services.length ? Math.min(...services.map((s) => s.duration)) : 15;
   const freeTimes = (day: string, barberIds: string[]) =>
-    busyByDate[day] ? generateSlots(day, busyByDate[day], barberIds, duration).filter((s) => s.available).map((s) => s.time) : [];
+    busyByDate[day] ? generateSlots(day, busyByDate[day], barberIds, duration, minGap).map((s) => s.time) : [];
 
   // Solo se ofrece el equipo que hace el servicio elegido
   const team = barbers.filter((b) => b.role === role);
@@ -151,10 +153,13 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
     scrollTo(timeRef);
   };
 
-  const allSlots = hasItems && !mustChoose && busyByDate[date] ? generateSlots(date, busyByDate[date], selectedIds, duration) : [];
-  const freeCount = allSlots.filter((s) => s.available).length;
-  const morning = allSlots.filter((s) => s.time < '12:00');
-  const afternoon = allSlots.filter((s) => s.time >= '12:00');
+  const allSlots = hasItems && !mustChoose && busyByDate[date] ? generateSlots(date, busyByDate[date], selectedIds, duration, minGap) : [];
+  const freeCount = allSlots.length;
+  // Recomendadas: pegadas a otra cita (el día queda compacto). Si no hay ninguna, se muestran todas igual.
+  const recommended = allSlots.filter((s) => s.recommended);
+  const others = recommended.length ? allSlots.filter((s) => !s.recommended) : allSlots;
+  const morning = others.filter((s) => s.time < '12:00');
+  const afternoon = others.filter((s) => s.time >= '12:00');
   const nextDayForBarber = value.barber
     ? dates.find((d) => d > date && freeTimes(d, [value.barber!.id]).length > 0)
     : undefined;
@@ -175,7 +180,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
     return { label: `${n} libres`, tone: n <= 3 ? ('few' as const) : ('ok' as const) };
   };
 
-  const slotButton = ({ time, available }: { time: string; available: boolean }) => (
+  const slotButton = ({ time, available, recommended: rec }: { time: string; available: boolean; recommended?: boolean }) => (
     <button
       key={time}
       onClick={() => available && update({ date, time })}
@@ -185,9 +190,11 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
       className={`py-2.5 rounded-xl text-sm font-mono font-medium border transition-all ${
         value.time === time
           ? 'border-gold bg-gold text-dark font-bold'
-          : available
-            ? 'border-white/10 text-zinc-200 hover:border-gold/50 hover:text-gold bg-white/[0.03]'
-            : 'border-white/[0.04] text-zinc-700 line-through cursor-not-allowed'
+          : !available
+            ? 'border-white/[0.04] text-zinc-700 line-through cursor-not-allowed'
+            : rec
+              ? 'border-gold/50 text-gold bg-black/30 hover:bg-gold/15'
+              : 'border-white/10 text-zinc-200 hover:border-gold/50 hover:text-gold bg-white/[0.03]'
       }`}
     >
       {time}
@@ -429,6 +436,18 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
                 <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-gold" /></div>
               ) : freeCount > 0 ? (
                 <div className="space-y-4">
+                  {recommended.length > 0 && (
+                    <div className="rounded-xl border border-gold/30 bg-gold/[0.06] p-3">
+                      <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-gold font-semibold">
+                        <Sparkles size={13} /> Horas recomendadas
+                      </p>
+                      <p className="text-[11px] text-zinc-400 mb-2.5">Van justo antes o después de otra cita: así no se pierde tiempo.</p>
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">{recommended.map(slotButton)}</div>
+                    </div>
+                  )}
+                  {recommended.length > 0 && others.length > 0 && (
+                    <p className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">Otras horas</p>
+                  )}
                   {[{ label: 'Mañana', icon: Sun, list: morning }, { label: 'Tarde', icon: Sunset, list: afternoon }]
                     .filter((g) => g.list.length > 0)
                     .map(({ label, icon: Icon, list }) => (

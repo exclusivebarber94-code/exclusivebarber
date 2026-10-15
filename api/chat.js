@@ -206,12 +206,17 @@ async function availability(db, biz, input) {
       cursor = Math.max(cursor, x.end);
     }
     if (cursor < hours.o_close) gaps.push({ start: cursor, end: hours.o_close });
+    // Sin pedazos inútiles: no se ofrece una hora que deje libre menos que el servicio más corto
+    const minGap = Math.min(...biz.services.map((x) => x.duration), 15);
+    const useful = (piece) => piece === 0 || piece >= minGap;
     const times = [];
     for (const g of gaps) {
-      const starts = [];
-      for (let t = g.start; t + duration <= g.end; t += duration) starts.push(t);
-      if (starts.length && g.end - duration > starts.at(-1)) starts.push(g.end - duration);
-      times.push(...starts.map(toTime));
+      if (g.end - g.start < duration) continue;
+      const candidates = new Set();
+      for (let t = g.start; t + duration <= g.end; t += duration) candidates.add(t);
+      candidates.add(g.end - duration);
+      const valid = [...candidates].filter((t) => useful(t - g.start) && useful(g.end - t - duration)).sort((x, y) => x - y);
+      times.push(...(valid.length ? valid : [g.start]).map(toTime));
     }
     return { nombre: b.name, horas_libres: times.slice(0, 24), total_libres: times.length };
   });
