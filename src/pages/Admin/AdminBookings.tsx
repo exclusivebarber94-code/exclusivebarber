@@ -9,6 +9,8 @@ import type { Booking } from '../../types';
 import { Panel, StatusBadge, Initials } from '../../components/admin/ui';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 import NewClientModal from '../../components/admin/NewClientModal';
+import ShiftedTag from '../../components/common/ShiftedTag';
+import { isShifted } from '../../lib/shifted';
 
 const STATUSES = Object.keys(STATUS_LABEL) as BookingStatus[];
 
@@ -68,6 +70,16 @@ export default function AdminBookings() {
     try {
       await updateBookingStatus(id, newStatus);
       setError('');
+      // Al completar antes de tiempo, la base adelanta las citas que venían pegadas: se recargan y se avisa
+      if (newStatus === 'completed') {
+        const fresh = await getBookings();
+        setList(fresh);
+        const since = Date.now() - 2 * 60 * 1000;
+        const moved = fresh.filter((b) => isShifted(b) && b.shiftedAt && new Date(b.shiftedAt).getTime() >= since);
+        if (moved.length) {
+          setNotice(`Se ${moved.length === 1 ? 'adelantó 1 cita' : `adelantaron ${moved.length} citas`} de hoy: ${moved.map((b) => `${b.clientName} (${b.originalTime} → ${b.time})`).join(', ')}. Usa «Avisar al cliente» en cada una.`);
+        }
+      }
     } catch (err) {
       console.error('No se pudo cambiar el estado de la reserva', err);
       if (previous) setList((prev) => prev.map((b) => (b.id === id ? { ...b, status: previous } : b)));
@@ -128,9 +140,12 @@ export default function AdminBookings() {
     {
       key: 'date', header: 'Cita',
       render: (b) => (
-        <span className="whitespace-nowrap">
-          <span className="text-zinc-200 text-sm">{dayShort(b.date)} {dayOfMonth(b.date)} {monthShort(b.date)}</span>
-          <span className="text-gold font-mono text-sm font-semibold ml-2">{b.time}</span>
+        <span className="flex flex-col gap-1">
+          <span className="whitespace-nowrap">
+            <span className="text-zinc-200 text-sm">{dayShort(b.date)} {dayOfMonth(b.date)} {monthShort(b.date)}</span>
+            <span className="text-gold font-mono text-sm font-semibold ml-2">{b.time}</span>
+          </span>
+          <ShiftedTag b={b} />
         </span>
       ),
     },

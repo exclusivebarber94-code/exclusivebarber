@@ -1,10 +1,11 @@
 import type { BusySlot } from '../services/bookings';
 import { todayKey, nowMinutes, timeToMinutes, minutesToTime } from './dates';
 import { bookingHoursFor, lunchFor } from './businessHours';
-import { businessConfig } from '../config/business';
 
-// Cada cuánto empieza una cita (businessConfig.slotStep, editable en Panel → Configuración → Reglas).
-// El horario de cada día sale de businessConfig.hours.
+// Horas que se ofrecen al reservar, «pegadas» a las citas: no hay intervalo fijo. Para cada barbero se
+// buscan los huecos libres del día (horario de atención, sin almuerzo ni citas) y en cada hueco se
+// ofrece la hora en que empieza y las siguientes según lo que dura el servicio pedido, más la hora que
+// lo deja terminando justo al final del hueco. Así una cita empieza cuando termina la anterior.
 
 export function isBarberFree(busy: BusySlot[], barberId: string, start: number, duration: number): boolean {
   const end = start + duration;
@@ -15,11 +16,32 @@ export function isBarberFree(busy: BusySlot[], barberId: string, start: number, 
   });
 }
 
+/** Huecos libres [inicio, fin) de un barbero en minutos, dentro de [open, close) y sin los bloqueos. */
+export function freeGaps(open: number, close: number, blocks: { start: number; end: number }[]): { start: number; end: number }[] {
+  const sorted = blocks.filter((b) => b.end > open && b.start < close).sort((a, b) => a.start - b.start);
+  const gaps = [];
+  let cursor = open;
+  for (const b of sorted) {
+    if (b.start > cursor) gaps.push({ start: cursor, end: Math.min(b.start, close) });
+    cursor = Math.max(cursor, b.end);
+  }
+  if (cursor < close) gaps.push({ start: cursor, end: close });
+  return gaps;
+}
+
+/** Horas de inicio dentro de un hueco: desde el comienzo, una detrás de otra, y la que termina justo al final. */
+export function startsInGap(gap: { start: number; end: number }, duration: number): number[] {
+  const starts = [];
+  for (let t = gap.start; t + duration <= gap.end; t += duration) starts.push(t);
+  const lastFit = gap.end - duration;
+  if (starts.length && lastFit > starts[starts.length - 1]) starts.push(lastFit);
+  return starts;
+}
+
 /**
- * Horas del día con al menos uno de `barberIds` libre durante toda la duración del servicio.
- * Solo dentro del horario de atención: el servicio debe terminar antes del cierre.
- * Las horas que ya pasaron (hoy, en Colombia) salen como no disponibles.
- * Los días que la barbería está cerrada o atiende por orden de llegada no tienen horas.
+ * Horas libres del día para un servicio de `duration` minutos con alguno de `barberIds`.
+ * Solo dentro del horario de atención (el servicio termina antes del cierre), fuera del almuerzo y
+ * desde ahora si es hoy (hora de Colombia). Los días cerrados o por orden de llegada no tienen horas.
  */
 export function generateSlots(
   date: string,
@@ -29,17 +51,18 @@ export function generateSlots(
 ): { time: string; available: boolean }[] {
   const hours = bookingHoursFor(date);
   if (!hours) return [];
-  const isToday = date === todayKey();
-  const now = nowMinutes();
   const lunch = lunchFor(date);
-  const slots = [];
-  for (let start = hours.open; start + duration <= hours.close; start += businessConfig.slotStep) {
-    // Durante el almuerzo no se ofrecen horas; las que se cruzarían con él salen ocupadas
-    if (lunch && start >= lunch.start && start < lunch.end) continue;
-    const crossesLunch = !!lunch && start < lunch.end && start + duration > lunch.start;
-    const isPast = isToday && start <= now;
-    const someoneFree = barberIds.some((id) => isBarberFree(busy, id, start, duration));
-    slots.push({ time: minutesToTime(start), available: !isPast && !crossesLunch && someoneFree });
+  // Hoy: desde la hora actual, redondeada a los 5 minutos siguientes
+  const from = date === todayKey() ? Math.max(hours.open, Math.ceil((nowMinutes() + 1) / 5) * 5) : hours.open;
+  const starts = new Set<number>();
+  for (const id of barberIds) {
+    const blocks = busy
+      .filter((b) => b.barberId === id)
+      .map((b) => ({ start: timeToMinutes(b.startTime), end: timeToMinutes(b.startTime) + b.duration }));
+    if (lunch) blocks.push({ start: lunch.start, end: lunch.end });
+    for (const gap of freeGaps(from, hours.close, blocks)) {
+      for (const t of startsInGap(gap, duration)) starts.add(t);
+    }
   }
-  return slots;
+  return [...starts].sort((a, b) => a - b).map((t) => ({ time: minutesToTime(t), available: true }));
 }

@@ -11,6 +11,8 @@ import { todayKey, addDays, dayShort, dayOfMonth, monthShort, monthLong, formatD
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import type { Barber, Booking } from '../../types';
 import BarberAvatar from '../../components/common/BarberAvatar';
+import ShiftedTag from '../../components/common/ShiftedTag';
+import { isShifted } from '../../lib/shifted';
 import ThemeToggle from '../../components/common/ThemeToggle';
 import { Panel, KpiCard, StatusBadge, Initials, EmptyState } from '../../components/admin/ui';
 import { GoldBarChart } from '../../components/admin/charts';
@@ -59,6 +61,7 @@ function AppointmentCard({ b, onStatus, busy }: { b: Booking; onStatus: (id: str
           </div>
           <StatusBadge status={b.status} />
         </div>
+        {isShifted(b) && <div className="mt-1.5"><ShiftedTag b={b} /></div>}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs">
           <span className="font-mono text-gold font-semibold">{formatCOP(b.price)}</span>
           <a href={whatsappLink(b.clientPhone)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300">
@@ -358,6 +361,7 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
   const [appts, setAppts] = useState<Booking[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [shiftNotice, setShiftNotice] = useState('');
   const [error, setError] = useState('');
 
   const handlePortalError = (err: unknown, fallback: string) => {
@@ -381,6 +385,14 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
       await setBarberBookingStatus(barber.id, pin, id, status);
       setAppts((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
       setError('');
+      // Si terminó antes de tiempo, la base adelantó las citas pegadas: se recarga la agenda
+      if (status === 'completed') {
+        const fresh = await getBarberBookings(barber.id, pin);
+        setAppts(fresh);
+        const since = Date.now() - 2 * 60 * 1000;
+        const moved = fresh.filter((b) => isShifted(b) && b.shiftedAt && new Date(b.shiftedAt).getTime() >= since);
+        if (moved.length) setShiftNotice(`Se ${moved.length === 1 ? 'adelantó 1 cita' : `adelantaron ${moved.length} citas`}: ${moved.map((b) => `${b.clientName.split(' ')[0]} ahora a las ${b.time}`).join(', ')}. Toca «Avisar al cliente» para escribirles.`);
+      }
     } catch (err) {
       handlePortalError(err, 'No se pudo guardar el cambio. Intenta de nuevo.');
     } finally {
@@ -431,6 +443,12 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
           {tab === 'agenda' && <span className="block text-sm font-sans font-normal text-zinc-500 mt-1">Toca un día para ver sus citas · {lowerFirst(formatDateLong(today))}</span>}
         </h1>
         {error && <div className="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
+        {shiftNotice && (
+          <div className="mb-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-sm flex items-start justify-between gap-3">
+            <span>{shiftNotice}</span>
+            <button onClick={() => setShiftNotice('')} className="text-amber-200/70 hover:text-amber-100 text-xs shrink-0">Cerrar</button>
+          </div>
+        )}
         {!loaded ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={26} className="animate-spin text-gold" />

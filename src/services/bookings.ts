@@ -15,6 +15,8 @@ interface BookingRow {
   price: number;
   status: string;
   created_at: string;
+  original_time?: string | null;
+  shifted_at?: string | null;
 }
 
 export function rowToBooking(row: BookingRow): Booking {
@@ -32,6 +34,8 @@ export function rowToBooking(row: BookingRow): Booking {
     price: row.price,
     status: row.status as Booking['status'],
     createdAt: row.created_at,
+    originalTime: row.original_time ?? undefined,
+    shiftedAt: row.shifted_at ?? undefined,
   };
 }
 

@@ -424,7 +424,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
             </section>
 
             <section ref={timeRef} className="scroll-mt-4">
-              <SectionTitle number={5} hint={allSlots.length > 0 && `${freeCount} de ${allSlots.length} libres`}>¿A qué hora?</SectionTitle>
+              <SectionTitle number={5} hint={freeCount > 0 && `${freeCount} ${freeCount === 1 ? "hora libre" : "horas libres"}`}>¿A qué hora?</SectionTitle>
               {loadingBusy && !busyByDate[date] ? (
                 <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-gold" /></div>
               ) : freeCount > 0 ? (
@@ -439,7 +439,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
                         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">{list.map(slotButton)}</div>
                       </div>
                     ))}
-                  <p className="text-[11px] text-zinc-600">Las horas tachadas ya están ocupadas.</p>
+                  <p className="text-[11px] text-zinc-600">Las horas se ajustan a lo que dura tu pedido ({duration} min): cada una empieza cuando termina la cita anterior.</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center text-center gap-3 py-5 px-4 rounded-xl border border-white/[0.06] bg-white/[0.02]">

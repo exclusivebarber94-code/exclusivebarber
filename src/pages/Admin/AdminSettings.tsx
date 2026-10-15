@@ -3,7 +3,7 @@ import {
   Store, Clock, CalendarX, ShieldCheck, ListChecks, Save, Loader2, CheckCircle2, AlertCircle, Trash2, Plus,
   Eye, EyeOff, KeyRound, Users, Megaphone, MessageCircle,
 } from 'lucide-react';
-import { currentSettings, saveSettings, SLOT_STEP_OPTIONS, DAYS_AHEAD_OPTIONS, type EditableSettings } from '../../services/settings';
+import { currentSettings, saveSettings, DAYS_AHEAD_OPTIONS, type EditableSettings } from '../../services/settings';
 import { changeAdminPassword, currentAdminEmail, AdminAuthError } from '../../services/adminAuth';
 import { getBarbers, updateBarber } from '../../services/barbers';
 import { noticeStart } from '../../lib/businessHours';
@@ -582,14 +582,14 @@ function BookingRulesCard() {
   return (
     <Panel title="Horas y anticipación" subtitle="Cómo se ofrecen las horas al reservar por la web">
       <div className="space-y-5">
-        <ChoiceRow
-          label="Las citas empiezan cada"
-          hint={`Con ${form.slotStep} minutos se ofrecen horas como 09:00, ${minutesLabel(9 * 60 + form.slotStep)}, ${minutesLabel(9 * 60 + 2 * form.slotStep)}…`}
-          options={SLOT_STEP_OPTIONS}
-          value={form.slotStep}
-          onChange={(slotStep) => { setForm({ ...form, slotStep }); setStatus(null); }}
-          format={(n) => `${n} min`}
-        />
+        <div>
+          <p className="text-white text-sm font-medium">Horas que se ofrecen</p>
+          <p className="text-zinc-400 text-xs leading-relaxed mt-1">
+            Se calculan cada día según lo que dura cada servicio (Panel → Servicios): cada cita empieza cuando
+            termina la anterior, sin huecos ni intervalos fijos. Si el barbero marca una cita como «Completada»
+            antes de tiempo, las citas que seguían pegadas se adelantan y aparecen marcadas para avisarle al cliente.
+          </p>
+        </div>
         <ChoiceRow
           label="Se puede reservar con anticipación de hasta"
           hint="Cuántos días hacia adelante ve el cliente para elegir (máximo 30)."
@@ -604,7 +604,6 @@ function BookingRulesCard() {
   );
 }
 
-const minutesLabel = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 function RulesTab() {
   return (

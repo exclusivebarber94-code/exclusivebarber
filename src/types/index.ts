@@ -51,6 +51,10 @@ export interface Booking {
   price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
   createdAt: string;
+  /** Hora que tenía antes de adelantarse (el barbero terminó la cita anterior antes de tiempo) */
+  originalTime?: string;
+  /** Cuándo se adelantó */
+  shiftedAt?: string;
 }
 
 export interface Testimonial {

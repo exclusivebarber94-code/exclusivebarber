@@ -189,15 +189,29 @@ async function availability(db, biz, input) {
     if (wanted && !wanted.available) return { ...base, estado: `${wanted.name} no está disponible por ahora para reservas.` };
     if (wanted) staff = staff.filter((b) => b.id === wanted.id);
   }
-  const step = Number(biz.settings.slotStep ?? 30);
-  const free = (barberId, start) => !busy.some((b) => b.barber_id === barberId && toMin(b.start_time) < start + duration && toMin(b.start_time) + b.duration > start);
-
+  // Horas «pegadas» a las citas (igual que src/lib/availability.ts): en cada hueco libre del barbero se
+  // ofrece la hora en que empieza, las siguientes según la duración y la que termina justo al final
+  const from = date === today.date ? Math.max(hours.o_open, Math.ceil((today.minutes + 1) / 5) * 5) : hours.o_open;
   const result = staff.map((b) => {
+    const blocks = busy
+      .filter((x) => x.barber_id === b.id)
+      .map((x) => ({ start: toMin(x.start_time), end: toMin(x.start_time) + x.duration }));
+    if (lunch.o_start !== null) blocks.push({ start: lunch.o_start, end: lunch.o_end });
+    blocks.sort((x, y) => x.start - y.start);
+    const gaps = [];
+    let cursor = from;
+    for (const x of blocks) {
+      if (x.end <= cursor) continue;
+      if (x.start > cursor) gaps.push({ start: cursor, end: Math.min(x.start, hours.o_close) });
+      cursor = Math.max(cursor, x.end);
+    }
+    if (cursor < hours.o_close) gaps.push({ start: cursor, end: hours.o_close });
     const times = [];
-    for (let t = hours.o_open; t + duration <= hours.o_close; t += step) {
-      if (date === today.date && t <= today.minutes) continue;
-      if (lunch.o_start !== null && t < lunch.o_end && t + duration > lunch.o_start) continue;
-      if (free(b.id, t)) times.push(toTime(t));
+    for (const g of gaps) {
+      const starts = [];
+      for (let t = g.start; t + duration <= g.end; t += duration) starts.push(t);
+      if (starts.length && g.end - duration > starts.at(-1)) starts.push(g.end - duration);
+      times.push(...starts.map(toTime));
     }
     return { nombre: b.name, horas_libres: times.slice(0, 24), total_libres: times.length };
   });
