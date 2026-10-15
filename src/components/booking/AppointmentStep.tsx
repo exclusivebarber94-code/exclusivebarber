@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, Loader2, Users, Sun, Sunset, CalendarX, Minus, Plus, X } from 'lucide-react';
+import { Clock, Loader2, Users, Sun, Sunset, CalendarX, Minus, Plus, X, ChevronDown } from 'lucide-react';
 import { getServices } from '../../services/services';
 import { getBarbers } from '../../services/barbers';
 import { getBusySlots, type BusySlot } from '../../services/bookings';
@@ -141,7 +141,8 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
   };
   const chooseDay = (key: string) => {
     update({ date: key, time: '' });
-    scrollTo(barberRef);
+    // Si ya hay barbero elegido, directo a las horas
+    scrollTo(value.barber ? timeRef : barberRef);
   };
   const chooseBarber = (barber: Barber | null) => {
     // Se queda en el día que se está viendo si esa persona tiene horas; si no, se propone su primer día libre
@@ -158,6 +159,12 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
     ? dates.find((d) => d > date && freeTimes(d, [value.barber!.id]).length > 0)
     : undefined;
   const ready = hasItems && !!value.time && !mustChoose;
+  // Lo que falta, para el botón de abajo: día → con quién → hora
+  const nextStep = !value.date
+    ? { ref: dayRef, label: 'Siguiente: elegir el día' }
+    : mustChoose
+      ? { ref: barberRef, label: 'Siguiente: elegir con quién' }
+      : { ref: timeRef, label: 'Siguiente: elegir la hora' };
 
   const dayStatus = (key: string) => {
     if (!hoursFor(key)) return { label: 'Cerrado', tone: 'off' as const };
@@ -468,17 +475,23 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
       </div>
 
       <div className="border-t border-white/10 px-5 sm:px-6 py-4 bg-[#0d0d0d]">
+        {/* Siempre a la vista: con todo listo continúa; si no, lleva al siguiente paso sin tener que bajar */}
         <button
-          disabled={!ready}
-          onClick={onContinue}
+          disabled={!hasItems}
+          onClick={() => (ready ? onContinue() : scrollTo(nextStep.ref))}
           className="w-full btn-gold py-3.5 rounded-full font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <span>
+          <span className="flex flex-col items-center leading-tight">
             {!hasItems
               ? 'Elige uno o varios servicios'
-              : !value.time
-                ? `Elige una hora · ${units} ${units === 1 ? 'servicio' : 'servicios'} · ${formatCOP(total)}`
-                : `Continuar · ${dayShort(date)} ${dayOfMonth(date)} a las ${value.time} · ${formatCOP(total)}`}
+              : ready
+                ? `Continuar · ${dayShort(date)} ${dayOfMonth(date)} a las ${value.time} · ${formatCOP(total)}`
+                : (
+                  <>
+                    <span className="flex items-center gap-1.5">{nextStep.label} <ChevronDown size={18} className="animate-bounce" /></span>
+                    <span className="text-xs font-normal opacity-80 mt-0.5">{units} {units === 1 ? 'servicio' : 'servicios'} · {formatCOP(total)}</span>
+                  </>
+                )}
           </span>
         </button>
       </div>
