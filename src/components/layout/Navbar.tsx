@@ -112,6 +112,7 @@ export default function Navbar({ onBooking }: NavbarProps) {
                     <a
                       key={href}
                       href={href}
+                      rel="nofollow"
                       role="menuitem"
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gold/10 transition-colors group"
                     >
@@ -174,6 +175,7 @@ export default function Navbar({ onBooking }: NavbarProps) {
                   <a
                     key={href}
                     href={href}
+                    rel="nofollow"
                     className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-gold/40 text-gold text-sm font-medium hover:bg-gold/10 transition-colors"
                   >
                     <Icon size={16} />

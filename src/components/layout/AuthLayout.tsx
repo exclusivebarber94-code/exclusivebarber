@@ -46,6 +46,7 @@ export default function AuthLayout({ role, title, subtitle, children }: Props) {
                 <a
                   key={id}
                   href={href}
+                  rel="nofollow"
                   aria-current={role === id ? 'page' : undefined}
                   className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                     role === id ? 'bg-gold text-dark shadow-gold' : 'text-zinc-400 hover:text-white'

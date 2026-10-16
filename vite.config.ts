@@ -10,6 +10,8 @@ const PUBLIC_PAGES = ['/', '/galeria', '/shop'];
  * configurada en Vercel -> Settings -> Environment Variables.
  */
 function seoFiles(siteUrl: string): Plugin {
+  // /admin y /barber no se bloquean aquí: Google debe poder entrar para leer su «noindex»
+  // (cabecera X-Robots-Tag en vercel.json). Si se bloquean, Google no lo ve y las sigue mostrando.
   return {
     name: 'exclusive-barber-seo-files',
     apply: 'build',
@@ -17,8 +19,6 @@ function seoFiles(siteUrl: string): Plugin {
       const robots = [
         'User-agent: *',
         'Allow: /',
-        'Disallow: /admin',
-        'Disallow: /barber',
         ...(siteUrl ? ['', `Sitemap: ${siteUrl}/sitemap.xml`] : []),
         '',
       ].join('\n');
