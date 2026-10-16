@@ -160,6 +160,89 @@ function AgendaTab({ appts, barber, onStatus, busyId }: { appts: Booking[]; barb
 
 // ---------------------------------------------------------------------------
 
+/** Lo que se hizo en un día que el barbero elige: servicios, total facturado y su ganancia. */
+function DaySummary({ appts, barber }: { appts: Booking[]; barber: Barber }) {
+  const today = todayKey();
+  const [day, setDay] = useState(today);
+  const ofDay = appts.filter((b) => b.date === day);
+  const done = ofDay.filter((b) => b.status === 'completed').sort((a, b) => a.time.localeCompare(b.time));
+  const total = done.reduce((s, b) => s + b.price, 0);
+  const earned = Math.round((total * barber.commission) / 100);
+  const pending = ofDay.filter((b) => b.status === 'pending' || b.status === 'confirmed').length;
+  const noShow = ofDay.filter((b) => b.status === 'no-show').length;
+  // Cuántas veces se hizo cada servicio ese día
+  const byService = [...done.reduce((m, b) => {
+    const row = m.get(b.serviceName) ?? { name: b.serviceName.trim(), count: 0, total: 0 };
+    row.count += 1;
+    row.total += b.price;
+    return m.set(b.serviceName, row);
+  }, new Map<string, { name: string; count: number; total: number }>()).values()].sort((a, b) => b.total - a.total);
+
+  const label = day === today ? 'Hoy' : day === addDays(today, -1) ? 'Ayer' : formatDateLong(day);
+
+  return (
+    <Panel
+      title="Resumen del día"
+      subtitle={day === today || day === addDays(today, -1) ? `${label} · ${lowerFirst(formatDateLong(day))}` : label}
+      action={
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setDay(addDays(day, -1))} aria-label="Día anterior" className="w-9 h-9 rounded-lg border border-white/10 flex items-center justify-center text-zinc-300 hover:text-gold hover:border-gold/40">
+            <ChevronLeft size={16} />
+          </button>
+          <input
+            type="date"
+            value={day}
+            max={today}
+            onChange={(e) => e.target.value && setDay(e.target.value > today ? today : e.target.value)}
+            aria-label="Elegir día"
+            className="h-9 px-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-sm [color-scheme:dark] focus:outline-none focus:border-gold/50"
+          />
+          <button onClick={() => setDay(addDays(day, 1))} disabled={day >= today} aria-label="Día siguiente" className="w-9 h-9 rounded-lg border border-white/10 flex items-center justify-center text-zinc-300 hover:text-gold hover:border-gold/40 disabled:opacity-30 disabled:pointer-events-none">
+            <ChevronRight size={16} />
+          </button>
+          {day !== today && (
+            <button onClick={() => setDay(today)} className="h-9 px-3 rounded-lg border border-gold/40 text-gold text-xs font-semibold hover:bg-gold/10">Hoy</button>
+          )}
+        </div>
+      }
+      bodyClassName="p-3 sm:p-4 space-y-4"
+    >
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Servicios hechos" value={done.length} sub={pending ? `${pending} por atender` : noShow ? `${noShow} ${noShow === 1 ? "no asistió" : "no asistieron"}` : 'completados'} icon={Scissors} accent="emerald" />
+        <KpiCard label="Total facturado" value={formatCOP(total)} sub="de lo completado" icon={Wallet} />
+        <KpiCard label="Tu ganancia" value={formatCOP(earned)} sub={`${barber.commission}% de comisión`} icon={Star} accent="violet" />
+        <KpiCard label="Citas del día" value={ofDay.filter((b) => b.status !== 'cancelled').length} sub={noShow && pending ? `${noShow} ${noShow === 1 ? "no asistió" : "no asistieron"}` : 'sin contar canceladas'} icon={CalendarDays} accent="blue" />
+      </div>
+
+      {done.length === 0 ? (
+        <EmptyState icon={Scissors}>{day === today ? 'Aún no has completado servicios hoy.' : 'Ese día no hubo servicios completados.'}</EmptyState>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {byService.map((s) => (
+              <span key={s.name} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs text-zinc-300">
+                <span className="font-mono font-bold text-gold">{s.count} ×</span> {s.name} <span className="text-zinc-500">· {formatCOP(s.total)}</span>
+              </span>
+            ))}
+          </div>
+          <ul className="divide-y divide-white/[0.06]">
+            {done.map((b) => (
+              <li key={b.id} className="flex items-center gap-3 px-2 py-3">
+                <span className="font-mono text-sm text-zinc-400 w-12">{b.time}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium truncate">{b.clientName}</p>
+                  <p className="text-zinc-500 text-xs truncate">{b.serviceName} · {formatCOP(b.price)}</p>
+                </div>
+                <span className="font-mono text-emerald-400 text-sm font-semibold">+{formatCOP(Math.round((b.price * barber.commission) / 100))}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 function EarningsTab({ appts, barber }: { appts: Booking[]; barber: Barber }) {
   const today = todayKey();
   const commission = (list: Booking[]) => Math.round((list.reduce((s, b) => s + b.price, 0) * barber.commission) / 100);
@@ -176,6 +259,7 @@ function EarningsTab({ appts, barber }: { appts: Booking[]; barber: Barber }) {
 
   return (
     <div className="space-y-5">
+      <DaySummary appts={appts} barber={barber} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiCard label="Hoy" value={formatCOP(commission(doneToday))} sub={`${doneToday.length} servicios`} icon={Wallet} />
         <KpiCard label="Últimos 7 días" value={formatCOP(commission(doneWeek))} sub={`${doneWeek.length} servicios`} icon={Wallet} accent="emerald" />
@@ -183,24 +267,6 @@ function EarningsTab({ appts, barber }: { appts: Booking[]; barber: Barber }) {
       </div>
       <Panel title="Lo que has ganado" subtitle={`Tu comisión por día · últimos 14 días`}>
         <GoldBarChart data={series} dataKey="revenue" nameKey="name" height={230} emptyText="Todavía no tienes servicios completados en estos días." />
-      </Panel>
-      <Panel title="Servicios completados hoy" subtitle={`${doneToday.length} servicios`} bodyClassName="p-3 sm:p-4">
-        {doneToday.length === 0 ? (
-          <EmptyState icon={Scissors}>Aún no has completado servicios hoy.</EmptyState>
-        ) : (
-          <ul className="divide-y divide-white/[0.06]">
-            {doneToday.sort((a, b) => a.time.localeCompare(b.time)).map((b) => (
-              <li key={b.id} className="flex items-center gap-3 px-2 py-3">
-                <span className="font-mono text-sm text-zinc-400 w-12">{b.time}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{b.clientName}</p>
-                  <p className="text-zinc-500 text-xs truncate">{b.serviceName} · {formatCOP(b.price)}</p>
-                </div>
-                <span className="font-mono text-emerald-400 text-sm font-semibold">+{formatCOP(Math.round((b.price * barber.commission) / 100))}</span>
-              </li>
-            ))}
-          </ul>
-        )}
       </Panel>
     </div>
   );
