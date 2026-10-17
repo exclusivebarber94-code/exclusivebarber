@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { getRecentlyCreatedBookings } from '../services/bookings';
 import { getContactMessages, setContactMessageRead, markAllContactMessagesRead } from '../services/contactMessages';
 import { formatDateLong } from '../lib/dates';
 import { useAutoRefresh } from './useAutoRefresh';
+import { playNotification, unlockAudioOnFirstInteraction } from '../lib/notificationSounds';
 
 // Notificaciones reales del panel: reservas nuevas (últimas 48 h) y mensajes del chat sin leer.
 // Cuando llega algo nuevo con el panel abierto, suena un aviso y, si se dio permiso,
@@ -37,30 +38,6 @@ function writeStorage(key: string, value: unknown) {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // Sin almacenamiento: las notificaciones se marcan como leídas solo en esta sesión
-  }
-}
-
-/** Sonido corto de aviso (sin archivos externos). */
-function playChime() {
-  try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioCtx();
-    [880, 1320].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      const start = ctx.currentTime + i * 0.15;
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.4);
-    });
-    window.setTimeout(() => ctx.close(), 1000);
-  } catch {
-    // El navegador puede bloquear el sonido hasta que la persona interactúe con la página
   }
 }
 
@@ -115,7 +92,8 @@ export function useAdminNotifications() {
       if (knownIds.current) {
         const fresh = next.filter((n) => !n.read && !knownIds.current!.has(n.id));
         if (fresh.length > 0) {
-          playChime();
+          // Suena el aviso más importante de lo que llegó (tonos en Configuración → Notificaciones)
+          playNotification(fresh.some((n) => n.type === 'booking') ? 'booking' : fresh.some((n) => n.type === 'cancelled') ? 'cancelled' : 'message');
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             fresh.slice(0, 3).forEach((n) => new Notification(n.title, { body: n.description, icon: '/logo_exclusivebarber.png', tag: n.id }));
           }
@@ -127,6 +105,9 @@ export function useAdminNotifications() {
       console.error('No se pudieron cargar las notificaciones', err);
     }
   }, []);
+
+  // El navegador solo deja sonar después del primer toque en la página
+  useEffect(() => { unlockAudioOnFirstInteraction(); }, []);
 
   // Sigue revisando aunque la pestaña esté en segundo plano: ahí es cuando más sirve el aviso
   useAutoRefresh(() => { load(); }, [load], 20_000, { whenHidden: true });

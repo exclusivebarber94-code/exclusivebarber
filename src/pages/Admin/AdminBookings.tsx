@@ -11,10 +11,11 @@ import DataTable, { type Column } from '../../components/admin/DataTable';
 import NewClientModal from '../../components/admin/NewClientModal';
 import ShiftedTag from '../../components/common/ShiftedTag';
 import { isShifted } from '../../lib/shifted';
+import { whatsappUrl } from '../../lib/phoneCountry';
 
 const STATUSES = Object.keys(STATUS_LABEL) as BookingStatus[];
 
-const whatsappLink = (phone: string) => `https://wa.me/57${phone.replace(/\D/g, '').slice(-10)}`;
+const whatsappLink = (phone: string) => whatsappUrl(phone);
 
 /** CSV que Excel abre bien: con BOM (tildes) y comillas (nombres con comas). */
 function toCSV(rows: (string | number)[][]): string {

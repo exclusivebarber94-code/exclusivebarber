@@ -5,6 +5,8 @@ import { getClients, normalizePhone, type ClientRecord } from '../../services/cl
 import { formatCOP } from '../../data';
 import type { Booking } from '../../types';
 import { Panel, KpiCard, Initials } from '../../components/admin/ui';
+import PhoneFlag from '../../components/common/PhoneFlag';
+import { phoneCountry, whatsappUrl } from '../../lib/phoneCountry';
 import DataTable, { type Column } from '../../components/admin/DataTable';
 
 interface Client {
@@ -50,8 +52,11 @@ function buildClients(records: ClientRecord[], bookings: Booking[]): Client[] {
   return clients.sort((a, b) => b.visits - a.visits || a.name.localeCompare(b.name));
 }
 
+/** «300 123 4567», y con el indicativo si no es de Colombia: «+58 412 838 3958» */
 function formatPhone(phone: string): string {
-  return phone.length === 10 ? `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}` : phone;
+  const local = phone.length === 10 ? `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}` : phone;
+  const { dial, iso } = phoneCountry(phone);
+  return iso && iso !== 'co' ? `+${dial} ${local}` : local;
 }
 
 const columns: Column<Client>[] = [
@@ -80,10 +85,12 @@ const columns: Column<Client>[] = [
     ),
   },
   {
-    key: 'phone', header: 'WhatsApp', aside: true,
+    key: 'phone', header: 'País · WhatsApp', aside: true,
     render: (c) => (
+      <span className="inline-flex items-center gap-2">
+      <PhoneFlag phone={c.phone} />
       <a
-        href={`https://wa.me/57${c.phone}`}
+        href={whatsappUrl(c.phone)}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 text-xs font-mono transition-all whitespace-nowrap"
@@ -92,6 +99,7 @@ const columns: Column<Client>[] = [
         <MessageCircle size={13} />
         {formatPhone(c.phone)}
       </a>
+      </span>
     ),
   },
   { key: 'visits', header: 'Visitas', render: (c) => <span className="font-mono text-white font-bold">{c.visits}</span> },

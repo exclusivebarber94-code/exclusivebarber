@@ -289,7 +289,7 @@ export default function AdminBarbers() {
                   <Phone size={13} className="text-zinc-500" />
                   <span className="text-zinc-300 font-mono">{barber.phone}</span>
                 </div>
-                <p className="text-zinc-400 text-xs leading-relaxed line-clamp-2">{barber.bio}</p>
+                <p className="text-zinc-400 text-xs leading-relaxed whitespace-pre-line">{barber.bio}</p>
               </div>
 
               <div className="flex flex-wrap gap-1.5 mb-5">
@@ -456,7 +456,7 @@ export default function AdminBarbers() {
                 <label className="text-zinc-400 text-xs mb-1.5 block">Descripción / Bio</label>
                 <textarea
                   className={`${inputClass('bio')} resize-none`}
-                  rows={3}
+                  rows={6}
                   placeholder="Describe al barbero, su experiencia..."
                   value={form.bio}
                   onChange={(e) => setForm({ ...form, bio: e.target.value })}

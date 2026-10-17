@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
   Store, Clock, CalendarX, ShieldCheck, ListChecks, Save, Loader2, CheckCircle2, AlertCircle, Trash2, Plus,
-  Eye, EyeOff, KeyRound, Users, Megaphone, MessageCircle,
+  Eye, EyeOff, KeyRound, Users, Megaphone, MessageCircle, Bell,
 } from 'lucide-react';
+import NotificationSoundsPanel from '../../components/admin/NotificationSoundsPanel';
 import { currentSettings, saveSettings, DAYS_AHEAD_OPTIONS, type EditableSettings } from '../../services/settings';
 import { changeAdminPassword, currentAdminEmail, AdminAuthError } from '../../services/adminAuth';
 import { getBarbers, updateBarber } from '../../services/barbers';
@@ -15,7 +16,7 @@ import type { Barber, BusinessHours, SpecialDay } from '../../types';
 // Configuración editable del negocio. Se guarda en la base de datos (tabla business_settings)
 // y la web la usa apenas se recarga: horarios, días especiales, contacto y redes.
 
-type Tab = 'negocio' | 'horario' | 'dias' | 'seguridad' | 'reglas';
+type Tab = 'negocio' | 'horario' | 'dias' | 'seguridad' | 'reglas' | 'notificaciones';
 type Status = { kind: 'ok' | 'error'; text: string } | null;
 
 const inputClass =
@@ -637,6 +638,7 @@ const TABS: { value: Tab; label: string; icon: React.ElementType }[] = [
   { value: 'dias', label: 'Días especiales', icon: CalendarX },
   { value: 'seguridad', label: 'Seguridad', icon: ShieldCheck },
   { value: 'reglas', label: 'Reglas', icon: ListChecks },
+  { value: 'notificaciones', label: 'Notificaciones', icon: Bell },
 ];
 
 export default function AdminSettings() {
@@ -655,6 +657,7 @@ export default function AdminSettings() {
       {tab === 'dias' && <SpecialDaysTab />}
       {tab === 'seguridad' && <SecurityTab />}
       {tab === 'reglas' && <RulesTab />}
+      {tab === 'notificaciones' && <NotificationSoundsPanel />}
     </div>
   );
 }

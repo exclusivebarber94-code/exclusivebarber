@@ -3,6 +3,7 @@ import { Loader2, MessageCircle, Check, Mail, MailOpen } from 'lucide-react';
 import { getContactMessages, setContactMessageRead, type ContactMessage } from '../../services/contactMessages';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { relativeTime } from '../../hooks/useAdminNotifications';
+import { whatsappUrl } from '../../lib/phoneCountry';
 
 function formatPhone(phone: string): string {
   return phone.length === 10 ? `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}` : phone;
@@ -10,7 +11,7 @@ function formatPhone(phone: string): string {
 
 function replyLink(m: ContactMessage): string {
   const text = `Hola ${m.name.split(' ')[0]}, te escribimos de Exclusive Barber por tu mensaje: "${m.message.slice(0, 120)}"`;
-  return `https://wa.me/57${m.phone}?text=${encodeURIComponent(text)}`;
+  return whatsappUrl(m.phone, text);
 }
 
 export default function AdminMessages() {

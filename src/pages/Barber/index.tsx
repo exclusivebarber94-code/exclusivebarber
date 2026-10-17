@@ -13,6 +13,7 @@ import type { Barber, Booking } from '../../types';
 import BarberAvatar from '../../components/common/BarberAvatar';
 import ShiftedTag from '../../components/common/ShiftedTag';
 import { isShifted } from '../../lib/shifted';
+import { whatsappUrl } from '../../lib/phoneCountry';
 import ThemeToggle from '../../components/common/ThemeToggle';
 import { Panel, KpiCard, StatusBadge, Initials, EmptyState } from '../../components/admin/ui';
 import { GoldBarChart } from '../../components/admin/charts';
@@ -30,7 +31,7 @@ const TABS: { id: BarberTab; label: string; icon: React.ElementType }[] = [
 ];
 
 const isOpen = (b: Booking) => b.status === 'pending' || b.status === 'confirmed';
-const whatsappLink = (phone: string) => `https://wa.me/57${phone.replace(/\D/g, '').slice(-10)}`;
+const whatsappLink = (phone: string) => whatsappUrl(phone);
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 function inMinutes(time: string): string {

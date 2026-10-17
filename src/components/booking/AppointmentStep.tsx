@@ -392,8 +392,8 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
                         <span className={`block text-sm font-semibold ${selected ? 'text-gold' : 'text-white'}`}>
                           {barber ? barber.name : 'El primero que esté libre'}
                         </span>
-                        <span className="block text-xs text-zinc-500 truncate">
-                          {barber ? barber.specialties.slice(0, 3).join(' · ') : 'Más horarios para elegir'}
+                        <span className="block text-xs text-zinc-500 leading-snug">
+                          {barber ? barber.specialties.join(' · ') : 'Más horarios para elegir'}
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
@@ -422,7 +422,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
                     <BarberAvatar barber={barber} className="w-12 h-12 rounded-full text-sm shrink-0 grayscale" />
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold text-zinc-300">{barber.name}</span>
-                      <span className="block text-xs text-zinc-500 truncate">{barber.specialties.slice(0, 3).join(' · ')}</span>
+                      <span className="block text-xs text-zinc-500">{barber.specialties.join(' · ')}</span>
                     </span>
                     <span className="shrink-0 text-[11px] font-semibold text-zinc-500">No disponible por ahora</span>
                   </div>
