@@ -11,7 +11,15 @@ import DataTable, { type Column } from '../../components/admin/DataTable';
 import NewClientModal from '../../components/admin/NewClientModal';
 import ShiftedTag from '../../components/common/ShiftedTag';
 import { isShifted } from '../../lib/shifted';
-import { whatsappUrl } from '../../lib/phoneCountry';
+import { whatsappUrl, phoneCountry } from '../../lib/phoneCountry';
+import PhoneFlag from '../../components/common/PhoneFlag';
+
+/** El celular con su indicativo cuando no es de Colombia («+58 4128383958») */
+const withDialCode = (phone: string) => {
+  const { iso, dial } = phoneCountry(phone);
+  const digits = phone.replace(/\D/g, '');
+  return iso && iso !== 'co' && !digits.startsWith(dial) ? `+${dial} ${phone}` : phone;
+};
 
 const STATUSES = Object.keys(STATUS_LABEL) as BookingStatus[];
 
@@ -123,15 +131,18 @@ export default function AdminBookings() {
           <Initials name={b.clientName} />
           <div className="min-w-0">
             <p className="text-white font-semibold text-sm truncate">{b.clientName}</p>
-            <a
-              href={whatsappLink(b.clientPhone)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-zinc-500 hover:text-emerald-400 text-xs font-mono transition-colors"
-              title="Escribir por WhatsApp"
-            >
-              <MessageCircle size={11} /> {b.clientPhone}
-            </a>
+            <span className="inline-flex items-center gap-1.5">
+              <PhoneFlag phone={b.clientPhone} className="w-4 h-3" />
+              <a
+                href={whatsappLink(b.clientPhone)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-zinc-500 hover:text-emerald-400 text-xs font-mono transition-colors"
+                title="Escribir por WhatsApp"
+              >
+                <MessageCircle size={11} /> {withDialCode(b.clientPhone)}
+              </a>
+            </span>
           </div>
         </div>
       ),
