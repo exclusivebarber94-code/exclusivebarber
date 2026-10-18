@@ -16,9 +16,8 @@ import PhoneFlag from '../../components/common/PhoneFlag';
 
 /** El celular con su indicativo cuando no es de Colombia («+58 4128383958») */
 const withDialCode = (phone: string) => {
-  const { iso, dial } = phoneCountry(phone);
-  const digits = phone.replace(/\D/g, '');
-  return iso && iso !== 'co' && !digits.startsWith(dial) ? `+${dial} ${phone}` : phone;
+  const { iso, dial, international } = phoneCountry(phone);
+  return iso && iso !== 'co' ? `+${dial} ${international.slice(dial.length)}` : phone;
 };
 
 const STATUSES = Object.keys(STATUS_LABEL) as BookingStatus[];

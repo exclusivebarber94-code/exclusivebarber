@@ -2,7 +2,9 @@ import { ChevronLeft, Loader2, User, CalendarDays, Clock } from 'lucide-react';
 import { ClipperIcon } from '../common/BarberIcons';
 import { formatCOP } from '../../data';
 import { formatDateLong, timeToMinutes, minutesToTime } from '../../lib/dates';
-import { isValidName, isValidPhone, type ClientContact } from '../../lib/clientContact';
+import { isValidName, type ClientContact } from '../../lib/clientContact';
+import { dialCountry, isValidPhoneFor } from '../../lib/phoneCountry';
+import CountryCodePicker from '../common/CountryCodePicker';
 import { cartUnits, cartDuration, cartPrice } from '../../lib/bookingCart';
 import type { Appointment } from './AppointmentStep';
 
@@ -20,7 +22,8 @@ export default function DetailsStep({ appointment, contact, loading, onChange, o
   const units = cartUnits(items);
   const endTime = minutesToTime(timeToMinutes(time) + cartDuration(items));
   const nameOk = isValidName(contact.name);
-  const phoneOk = isValidPhone(contact.phone);
+  const country = dialCountry(contact.country);
+  const phoneOk = isValidPhoneFor(contact.country, contact.phone);
 
   const rows = [
     { icon: User, label: 'Barbero', value: barber?.name ?? 'El que esté libre' },
@@ -82,19 +85,26 @@ export default function DetailsStep({ appointment, contact, loading, onChange, o
           </div>
           <div>
             <label htmlFor="booking-phone" className="text-xs text-zinc-400 uppercase tracking-wider block mb-2">Tu celular (WhatsApp)</label>
-            <input
-              id="booking-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="300 123 4567"
-              value={contact.phone}
-              onChange={(e) => onChange({ ...contact, phone: e.target.value })}
-              aria-invalid={contact.phone !== '' && !phoneOk}
-              className="w-full px-4 py-3.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-zinc-600 text-base focus:outline-none focus:border-gold/60 transition-colors"
-            />
+            <div className="flex gap-2">
+              <CountryCodePicker value={contact.country} onChange={(country) => onChange({ ...contact, country })} />
+              <input
+                id="booking-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
+                placeholder={country.example}
+                value={contact.phone}
+                onChange={(e) => onChange({ ...contact, phone: e.target.value })}
+                aria-invalid={contact.phone !== '' && !phoneOk}
+                className="flex-1 min-w-0 px-4 py-3.5 rounded-xl bg-white/[0.04] border border-white/10 text-white placeholder-zinc-600 text-base focus:outline-none focus:border-gold/60 transition-colors"
+              />
+            </div>
             {contact.phone !== '' && !phoneOk && (
-              <p className="text-amber-400 text-xs mt-1.5">Escribe tu celular de 10 dígitos.</p>
+              <p className="text-amber-400 text-xs mt-1.5">
+                {country.iso === 'co'
+                  ? 'Escribe tu celular de 10 dígitos.'
+                  : `Revisa el número: en ${country.name} tiene ${country.min === country.max ? country.min : `${country.min} a ${country.max}`} dígitos, sin el +${country.dial}.`}
+              </p>
             )}
           </div>
           <p className="text-zinc-500 text-xs leading-relaxed">

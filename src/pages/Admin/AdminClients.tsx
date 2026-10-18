@@ -54,8 +54,10 @@ function buildClients(records: ClientRecord[], bookings: Booking[]): Client[] {
 
 /** «300 123 4567», y con el indicativo si no es de Colombia: «+58 412 838 3958» */
 function formatPhone(phone: string): string {
-  const local = phone.length === 10 ? `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}` : phone;
-  const { dial, iso } = phoneCountry(phone);
+  const { dial, iso, international } = phoneCountry(phone);
+  // El número sin indicativo (aunque se haya guardado con él)
+  const national = iso && iso !== 'co' ? international.slice(dial.length) : phone.replace(/\D/g, '').replace(/^57(?=\d{10}$)/, '');
+  const local = national.length === 10 ? `${national.slice(0, 3)} ${national.slice(3, 6)} ${national.slice(6)}` : national;
   return iso && iso !== 'co' ? `+${dial} ${local}` : local;
 }
 

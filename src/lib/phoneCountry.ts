@@ -51,6 +51,66 @@ export function phoneCountry(raw: string): PhoneCountry {
   return { iso: '', name: 'País no identificado', dial: '57', international: digits.length === 10 ? `57${digits}` : digits };
 }
 
+// ---------------------------------------------------------------- selector de país al reservar
+
+export interface DialCountry {
+  iso: string;
+  name: string;
+  dial: string;
+  /** Ejemplo para el campo */
+  example: string;
+  /** Dígitos del número nacional (sin indicativo) */
+  min: number;
+  max: number;
+}
+
+/** Países que se pueden elegir en el formulario (Colombia primero; luego los más frecuentes) */
+export const DIAL_COUNTRIES: DialCountry[] = [
+  { iso: 'co', name: 'Colombia', dial: '57', example: '300 123 4567', min: 10, max: 10 },
+  { iso: 've', name: 'Venezuela', dial: '58', example: '412 123 4567', min: 10, max: 10 },
+  { iso: 'us', name: 'Estados Unidos / Canadá', dial: '1', example: '305 555 1234', min: 10, max: 10 },
+  { iso: 'ec', name: 'Ecuador', dial: '593', example: '99 123 4567', min: 9, max: 9 },
+  { iso: 'pe', name: 'Perú', dial: '51', example: '912 345 678', min: 9, max: 9 },
+  { iso: 'pa', name: 'Panamá', dial: '507', example: '6123 4567', min: 8, max: 8 },
+  { iso: 'mx', name: 'México', dial: '52', example: '55 1234 5678', min: 10, max: 10 },
+  { iso: 'do', name: 'República Dominicana', dial: '1', example: '809 123 4567', min: 10, max: 10 },
+  { iso: 'cr', name: 'Costa Rica', dial: '506', example: '8312 3456', min: 8, max: 8 },
+  { iso: 'cl', name: 'Chile', dial: '56', example: '9 1234 5678', min: 9, max: 9 },
+  { iso: 'ar', name: 'Argentina', dial: '54', example: '9 11 1234 5678', min: 10, max: 11 },
+  { iso: 'br', name: 'Brasil', dial: '55', example: '11 91234 5678', min: 10, max: 11 },
+  { iso: 'es', name: 'España', dial: '34', example: '612 345 678', min: 9, max: 9 },
+  { iso: 'it', name: 'Italia', dial: '39', example: '312 345 6789', min: 9, max: 10 },
+];
+
+export const dialCountry = (iso?: string) => DIAL_COUNTRIES.find((c) => c.iso === iso) ?? DIAL_COUNTRIES[0];
+
+/** Número nacional que escribió la persona, sin espacios, sin el 0 inicial ni el indicativo repetido */
+function nationalDigits(country: DialCountry, phone: string): string {
+  let d = phone.replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  if (d.length > country.max && d.startsWith(country.dial)) d = d.slice(country.dial.length);
+  if (d.length > country.max && d.startsWith('0')) d = d.slice(1);
+  return d;
+}
+
+/** ¿El número es válido para ese país? */
+export function isValidPhoneFor(iso: string | undefined, phone: string): boolean {
+  const c = dialCountry(iso);
+  const n = nationalDigits(c, phone).replace(/^0/, '');
+  if (c.iso === 'co') return /^3\d{9}$|^60\d{8}$/.test(n);
+  return n.length >= c.min && n.length <= c.max;
+}
+
+/**
+ * Cómo se guarda el celular: Colombia sin indicativo (10 dígitos, como siempre); los demás países
+ * con «+» e indicativo («+584121234567») para reconocer el país y escribirles por WhatsApp.
+ */
+export function storedPhone(iso: string | undefined, phone: string): string {
+  const c = dialCountry(iso);
+  const n = nationalDigits(c, phone).replace(/^0/, '');
+  return c.iso === 'co' ? n : `+${c.dial}${n}`;
+}
+
 /** Enlace de WhatsApp con el indicativo correcto (y un mensaje opcional) */
 export function whatsappUrl(phone: string, text?: string): string {
   const { international } = phoneCountry(phone);

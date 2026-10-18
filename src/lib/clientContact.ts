@@ -7,6 +7,8 @@ const LEGACY_CHAT_KEY = 'exclusive-barber-chat-contact';
 export interface ClientContact {
   name: string;
   phone: string;
+  /** País del celular (código ISO: co, ve, us…). Si falta, Colombia */
+  country?: string;
 }
 
 export function loadClientContact(): ClientContact {
@@ -14,18 +16,18 @@ export function loadClientContact(): ClientContact {
     try {
       const saved = JSON.parse(localStorage.getItem(key) ?? 'null');
       if (saved && typeof saved.name === 'string' && typeof saved.phone === 'string') {
-        return { name: saved.name, phone: saved.phone };
+        return { name: saved.name, phone: saved.phone, country: typeof saved.country === 'string' ? saved.country : 'co' };
       }
     } catch {
       // Sin almacenamiento disponible (modo privado, etc.)
     }
   }
-  return { name: '', phone: '' };
+  return { name: '', phone: '', country: 'co' };
 }
 
 export function saveClientContact(contact: ClientContact) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: contact.name.trim(), phone: contact.phone.trim() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: contact.name.trim(), phone: contact.phone.trim(), country: contact.country ?? 'co' }));
   } catch {
     // No es necesario recordar los datos para reservar
   }

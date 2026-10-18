@@ -4,6 +4,7 @@ import type { Service } from '../../types';
 import { createBooking, BookingError, type BookingErrorCode } from '../../services/bookings';
 import { businessConfig } from '../../config/business';
 import { loadClientContact, saveClientContact, type ClientContact } from '../../lib/clientContact';
+import { storedPhone } from '../../lib/phoneCountry';
 import AppointmentStep, { type Appointment } from './AppointmentStep';
 import DetailsStep from './DetailsStep';
 import BookingTicket, { type TicketData } from './BookingTicket';
@@ -103,7 +104,7 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
           date,
           time: schedule[i].time,
           clientName: i === 0 ? contact.name.trim() : `${contact.name.trim()} (turno ${i + 1})`,
-          clientPhone: contact.phone.trim(),
+          clientPhone: storedPhone(contact.country, contact.phone),
         });
         barberId = booking.barberId;
         created.push(booking);

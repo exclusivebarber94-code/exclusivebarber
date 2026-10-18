@@ -62,8 +62,12 @@ export default async function handler(req, res) {
   const [year, month, day] = booking.date.split('-');
   const dateFormatted = `${parseInt(day, 10)} de ${MONTHS[parseInt(month, 10) - 1]} de ${year}`;
   const priceFormatted = `$${Number(booking.price).toLocaleString('es-CO')}`;
-  const digits = String(booking.client_phone).replace(/\D/g, '').replace(/^57(?=\d{10}$)/, '');
-  const clientTo = `whatsapp:+57${digits}`;
+  // Colombia se guarda sin indicativo (10 dígitos); los demás países con «+indicativo» desde el formulario
+  const rawPhone = String(booking.client_phone).trim();
+  const digits = rawPhone.replace(/\D/g, '');
+  const clientTo = rawPhone.startsWith('+')
+    ? `whatsapp:+${digits}`
+    : `whatsapp:+57${digits.replace(/^57(?=\d{10}$)/, '')}`;
 
   const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
   const sendTemplate = async (to, contentSid, variables) => {
