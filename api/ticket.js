@@ -1,9 +1,9 @@
-// Imagen del ticket de una reserva: GET /api/ticket/<id de la reserva>
+// Imagen del ticket de una reserva: GET /api/ticket/<id de la reserva> (vercel.json → /api/ticket?id=…)
 // La usa la plantilla de WhatsApp «ticket» como imagen del mensaje. El id es un UUID imposible de
 // adivinar y la imagen solo muestra lo mismo que el cliente ve en su ticket.
 
-import { connectDb, bookingGroup, summarize, isUuid } from '../_reserva.js';
-import { renderTicket } from '../_ticketImage.js';
+import { connectDb, bookingGroup, summarize, isUuid } from './_reserva.js';
+import { renderTicket } from './_ticketImage.js';
 
 const DEFAULT_ADDRESS = 'Cl 6c #14A-15, Los Ángeles, Valledupar';
 

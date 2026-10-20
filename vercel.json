@@ -19,6 +19,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/ticket/:id",
+      "destination": "/api/ticket?id=:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
