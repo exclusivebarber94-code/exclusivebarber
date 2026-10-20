@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Delete, Loader2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import AuthLayout from '../../components/layout/AuthLayout';
-import { getBarbers } from '../../services/barbers';
+import { getTeam } from '../../services/barbers';
 import { barberLogin } from '../../services/barberPortal';
 import type { Barber } from '../../types';
 import BarberAvatar from '../../components/common/BarberAvatar';
@@ -22,7 +22,7 @@ export default function BarberLogin({ onLogin }: Props) {
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    getBarbers()
+    getTeam()
       .then(setBarbers)
       .catch((err) => {
         console.error('No se pudieron cargar los barberos', err);

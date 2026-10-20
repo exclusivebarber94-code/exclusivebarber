@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, UserPlus, Loader2, Minus, Plus, Clock, Check } from 'lucide-react';
 import { getServices } from '../../services/services';
-import { getBarbers } from '../../services/barbers';
+import { getTeam } from '../../services/barbers';
 import { createManualBookings } from '../../services/bookings';
 import { formatCOP } from '../../data';
 import { todayKey, nowMinutes, minutesToTime, formatDateLong } from '../../lib/dates';
@@ -48,7 +48,7 @@ export default function NewClientModal({ onClose, onSaved }: Props) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([getServices(), getBarbers()])
+    Promise.all([getServices(), getTeam()])
       .then(([s, b]) => { setServices([...s].sort((x, y) => Number(!!y.popular) - Number(!!x.popular))); setTeam(b); })
       .catch((err) => {
         console.error('No se pudieron cargar servicios y equipo', err);

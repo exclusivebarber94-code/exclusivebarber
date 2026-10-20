@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { businessConfig } from '../config/business';
 import { toDrawableImage, isSupportedImage } from '../lib/imageFile';
 import type { Barber } from '../types';
 
@@ -44,6 +45,15 @@ function rowToBarber(row: BarberRow): Barber {
 const BARBER_COLUMNS =
   'id, name, short_name, role, phone, bio, specialties, rating, review_count, available, commission, total_services_month, earnings_month, avatar, photo_url';
 
+/** ¿Está retirado del equipo? (Panel → Barberos → Retirar) */
+export const isRetired = (barber: Pick<Barber, 'id'>) => businessConfig.retiredBarbers.includes(barber.id);
+
+/** El equipo activo: sin los retirados. Para la web, la reserva, el portal y los formularios. */
+export async function getTeam(): Promise<Barber[]> {
+  return (await getBarbers()).filter((b) => !isRetired(b));
+}
+
+/** Todos, incluidos los retirados (reportes, contabilidad e historial). */
 export async function getBarbers(): Promise<Barber[]> {
   const { data, error } = await supabase
     .from('barbers')

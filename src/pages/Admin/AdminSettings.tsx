@@ -6,7 +6,7 @@ import {
 import NotificationSoundsPanel from '../../components/admin/NotificationSoundsPanel';
 import { currentSettings, saveSettings, DAYS_AHEAD_OPTIONS, type EditableSettings } from '../../services/settings';
 import { changeAdminPassword, currentAdminEmail, AdminAuthError } from '../../services/adminAuth';
-import { getBarbers, updateBarber } from '../../services/barbers';
+import { getTeam, updateBarber } from '../../services/barbers';
 import { noticeStart } from '../../lib/businessHours';
 import { upcomingHolidays } from '../../lib/holidays';
 import { todayKey, addDays, formatDateLong } from '../../lib/dates';
@@ -397,7 +397,7 @@ function SecurityTab() {
 
   useEffect(() => {
     currentAdminEmail().then(setEmail);
-    getBarbers()
+    getTeam()
       .then((list) => { setBarbers(list); setPin((p) => ({ ...p, barberId: p.barberId || list[0]?.id || '' })); })
       .catch((err) => console.error('No se pudieron cargar los barberos', err));
   }, []);

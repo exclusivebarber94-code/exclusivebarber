@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, Loader2, Users, Sun, Sunset, CalendarX, Minus, Plus, X, ChevronDown, Sparkles } from 'lucide-react';
 import { getServices } from '../../services/services';
-import { getBarbers } from '../../services/barbers';
+import { getTeam } from '../../services/barbers';
 import { getBusySlots, type BusySlot } from '../../services/bookings';
 import { generateSlots } from '../../lib/availability';
 import { hoursFor, specialDayOf } from '../../lib/businessHours';
@@ -63,7 +63,7 @@ export default function AppointmentStep({ value, onChange, onContinue }: Props) 
   const dates = Array.from({ length: businessConfig.daysAhead }, (_, i) => addDays(todayKey(), i));
 
   useEffect(() => {
-    Promise.all([getServices(), getBarbers()])
+    Promise.all([getServices(), getTeam()])
       .then(([serviceList, barberList]) => {
         setServices([...serviceList].sort((a, b) => Number(!!b.popular) - Number(!!a.popular)));
         setBarbers(barberList.filter((b) => b.available));

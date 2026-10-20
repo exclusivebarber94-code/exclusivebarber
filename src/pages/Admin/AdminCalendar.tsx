@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getBookingsInRange } from '../../services/bookings';
-import { getBarbers } from '../../services/barbers';
+import { getBarbers, isRetired } from '../../services/barbers';
 import { todayKey, addDays, startOfWeek, dayOfMonth } from '../../lib/dates';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { businessConfig } from '../../config/business';
@@ -97,8 +97,10 @@ export default function AdminCalendar() {
   const barberIds = new Set(barbers.map((b) => b.id));
   const dayBookings = bookings.filter((b) => b.date === currentDate);
   const unassigned = dayBookings.filter((b) => !barberIds.has(b.barberId));
+  // Los retirados solo aparecen los días en que tienen citas (su historial)
+  const shown = barbers.filter((b) => !isRetired(b) || bookings.some((x) => x.barberId === b.id));
   const columns: { id: string; label: string; available?: boolean }[] = [
-    ...barbers.map((b) => ({ id: b.id, label: b.shortName, available: b.available })),
+    ...shown.map((b) => ({ id: b.id, label: b.shortName, available: b.available })),
     ...(unassigned.length > 0 ? [{ id: UNASSIGNED, label: 'Sin asignar' }] : []),
   ];
 

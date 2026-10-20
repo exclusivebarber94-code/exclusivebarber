@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, Phone, Edit2, ToggleLeft, ToggleRight, X, Plus, User, Loader2, Camera, Trash2 } from 'lucide-react';
+import { Star, Phone, Edit2, ToggleLeft, ToggleRight, X, Plus, User, Loader2, Camera, Trash2, UserMinus, RotateCcw, Archive } from 'lucide-react';
 import { getBarbers, updateBarberAvailability, createBarber, updateBarber, uploadBarberPhoto, deleteBarberWithPhoto } from '../../services/barbers';
 import { getBookingsByMonth } from '../../services/bookings';
+import { saveSettings } from '../../services/settings';
+import { businessConfig } from '../../config/business';
 import { formatCOP } from '../../data';
 import { todayKey } from '../../lib/dates';
 import { barberMonthStats } from '../../lib/stats';
@@ -43,6 +45,9 @@ export default function AdminBarbers() {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Barber | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Retirados del equipo: se ocultan de la web, pero su historial y comisión siguen en los reportes
+  const [retiredIds, setRetiredIds] = useState<string[]>(businessConfig.retiredBarbers);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
   const photoTarget = useRef<Barber | null>(null);
 
@@ -84,6 +89,45 @@ export default function AdminBarbers() {
       setDeleteTarget(null);
     }
   };
+
+  const retire = async () => {
+    if (!deleteTarget) return;
+    const barber = deleteTarget;
+    setDeleting(true);
+    try {
+      // Sin reservas nuevas (el servidor las rechaza) y fuera de la web, el portal y los formularios
+      if (barber.available) await updateBarberAvailability(barber.id, false);
+      const next = [...new Set([...businessConfig.retiredBarbers, barber.id])];
+      await saveSettings({ retiredBarbers: next });
+      setRetiredIds(next);
+      setList((prev) => prev.map((b) => b.id === barber.id ? { ...b, available: false } : b));
+      setPageError('');
+    } catch (err) {
+      console.error('No se pudo retirar del equipo', err);
+      setPageError('No se pudo retirar del equipo. Intenta de nuevo.');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  const restore = async (barber: Barber) => {
+    setRestoringId(barber.id);
+    try {
+      const next = businessConfig.retiredBarbers.filter((id) => id !== barber.id);
+      await saveSettings({ retiredBarbers: next });
+      setRetiredIds(next);
+      setPageError('');
+    } catch (err) {
+      console.error('No se pudo volver a activar', err);
+      setPageError('No se pudo volver a activar. Intenta de nuevo.');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  const team = list.filter((b) => !retiredIds.includes(b.id));
+  const retired = list.filter((b) => retiredIds.includes(b.id));
 
   useEffect(() => {
     const [year, month] = todayKey().split('-').map(Number);
@@ -222,7 +266,7 @@ export default function AdminBarbers() {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-white text-base">Equipo</h3>
-          <p className="text-zinc-500 text-xs mt-0.5">{list.filter((b) => b.role === 'barbero').length} barberos · {list.filter((b) => b.role === 'manicurista').length} manicuristas</p>
+          <p className="text-zinc-500 text-xs mt-0.5">{team.filter((b) => b.role === 'barbero').length} barberos · {team.filter((b) => b.role === 'manicurista').length} manicuristas</p>
         </div>
         <button
           onClick={openAdd}
@@ -240,7 +284,7 @@ export default function AdminBarbers() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {list.map((barber) => (
+          {team.map((barber) => (
             <div key={barber.id} className="table-card p-6 border border-white/[0.08] hover:border-gold/30 transition-all duration-200">
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-4">
@@ -334,7 +378,7 @@ export default function AdminBarbers() {
                 </button>
                 <button
                   onClick={() => setDeleteTarget(barber)}
-                  title="Eliminar barbero"
+                  title="Retirar o eliminar"
                   className="btn-danger-glass p-2 rounded-xl text-xs"
                 >
                   <Trash2 size={14} />
@@ -349,6 +393,35 @@ export default function AdminBarbers() {
         </div>
       )}
 
+      {retired.length > 0 && (
+        <section className="table-card p-5 border border-white/[0.08]">
+          <div className="flex items-center gap-2 mb-1">
+            <Archive size={15} className="text-zinc-400" />
+            <h3 className="font-semibold text-white text-sm">Retirados del equipo</h3>
+          </div>
+          <p className="text-zinc-500 text-xs mb-4">No aparecen en la web, la reserva ni el portal. Sus servicios, ingresos y comisión siguen en Reportes y en el Dashboard.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {retired.map((barber) => (
+              <div key={barber.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                <BarberAvatar barber={barber} className="w-11 h-11 rounded-full text-sm border border-white/10 grayscale" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-zinc-200 text-sm font-medium truncate">{barber.name}</p>
+                  <p className="text-zinc-500 text-[11px]">{barber.role === 'manicurista' ? 'Manicurista' : 'Barbero'} · comisión {barber.commission}%</p>
+                </div>
+                <button
+                  onClick={() => restore(barber)}
+                  disabled={restoringId === barber.id}
+                  className="btn-dark-glass px-3 py-2 rounded-xl text-xs font-medium hover:border-gold/40 hover:text-gold disabled:opacity-50"
+                >
+                  {restoringId === barber.id ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                  Volver a activar
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <input
         ref={photoInput}
         type="file"
@@ -361,11 +434,32 @@ export default function AdminBarbers() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)} />
           <div className="relative w-full max-w-sm glass border border-white/10 rounded-2xl p-6">
-            <h2 className="font-semibold text-white mb-2">¿Eliminar a {deleteTarget.name}?</h2>
-            <p className="text-zinc-400 text-sm mb-6">
-              Dejará de aparecer en la web y no podrá entrar al portal. Sus citas pasadas se conservan con su nombre.
-              Esta acción no se puede deshacer.
+            <h2 className="font-semibold text-white mb-2">¿Sacar a {deleteTarget.name} del equipo?</h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Dejará de aparecer en la web, en la reserva y en el portal de barberos.
             </p>
+            <button
+              onClick={retire}
+              disabled={deleting}
+              className="w-full text-left p-3.5 mb-2 rounded-xl border border-gold/40 bg-gold/10 hover:bg-gold/15 transition-colors disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2 text-gold text-sm font-semibold">
+                {deleting ? <Loader2 size={14} className="animate-spin" /> : <UserMinus size={14} />}
+                Retirar del equipo (recomendado)
+              </span>
+              <span className="block text-zinc-400 text-xs mt-1">Conserva lo facturado, su nombre completo y su comisión en Reportes y Dashboard. Se puede volver a activar.</span>
+            </button>
+            <button
+              onClick={confirmDelete}
+              disabled={deleting}
+              className="w-full text-left p-3.5 mb-5 rounded-xl border border-red-500/30 hover:bg-red-500/10 transition-colors disabled:opacity-60"
+            >
+              <span className="flex items-center gap-2 text-red-400 text-sm font-semibold">
+                <Trash2 size={14} />
+                Eliminar definitivamente
+              </span>
+              <span className="block text-zinc-400 text-xs mt-1">Los ingresos se conservan, pero sus citas quedan «Sin asignar» y se pierde su comisión en los reportes. No se puede deshacer.</span>
+            </button>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setDeleteTarget(null)}
@@ -373,14 +467,6 @@ export default function AdminBarbers() {
                 className="px-5 py-2 glass border border-white/10 rounded-xl text-zinc-400 hover:text-white text-sm"
               >
                 Cancelar
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleting}
-                className="px-5 py-2 rounded-xl bg-red-500/80 hover:bg-red-500 text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-60"
-              >
-                {deleting && <Loader2 size={14} className="animate-spin" />}
-                Eliminar
               </button>
             </div>
           </div>

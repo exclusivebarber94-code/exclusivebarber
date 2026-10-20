@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Star, Calendar, Zap } from 'lucide-react';
-import { getBarbers } from '../../services/barbers';
+import { getTeam } from '../../services/barbers';
 import { businessConfig } from '../../config/business';
 import type { Barber } from '../../types';
 import BarberAvatar from '../common/BarberAvatar';
@@ -13,7 +13,7 @@ export default function Team({ onBooking }: TeamProps) {
   const [barbers, setBarbers] = useState<Barber[]>([]);
 
   useEffect(() => {
-    getBarbers()
+    getTeam()
       .then(setBarbers)
       .catch((err) => console.error('No se pudieron cargar los barberos', err));
   }, []);

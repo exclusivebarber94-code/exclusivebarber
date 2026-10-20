@@ -8,7 +8,7 @@ import type { BusinessConfig, BusinessHours, LunchBreak, SpecialDay } from '../t
 
 export type EditableSettings = Pick<
   BusinessConfig,
-  'tagline' | 'address' | 'phone' | 'whatsapp' | 'email' | 'instagram' | 'tiktok' | 'facebook' | 'hours' | 'holidayHours' | 'specialDays' | 'allowAnyBarber' | 'slotStep' | 'daysAhead' | 'lunch'
+  'tagline' | 'address' | 'phone' | 'whatsapp' | 'email' | 'instagram' | 'tiktok' | 'facebook' | 'hours' | 'holidayHours' | 'specialDays' | 'allowAnyBarber' | 'slotStep' | 'daysAhead' | 'lunch' | 'retiredBarbers'
 >;
 
 /** Opciones de «las citas empiezan cada…» (minutos) */
@@ -54,6 +54,7 @@ function apply(data: Partial<EditableSettings>) {
   if (validSlotStep(data.slotStep)) businessConfig.slotStep = data.slotStep;
   if (validDaysAhead(data.daysAhead)) businessConfig.daysAhead = data.daysAhead;
   if (validLunch(data.lunch)) businessConfig.lunch = data.lunch;
+  if (Array.isArray(data.retiredBarbers) && data.retiredBarbers.every((x) => typeof x === 'string')) businessConfig.retiredBarbers = data.retiredBarbers;
   if (Array.isArray(data.specialDays) && data.specialDays.every(validSpecialDay)) {
     businessConfig.specialDays = [...data.specialDays].sort((a, b) => a.date.localeCompare(b.date));
   }
@@ -71,8 +72,8 @@ export async function loadSettings(): Promise<void> {
 }
 
 export function currentSettings(): EditableSettings {
-  const { tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch } = businessConfig;
-  return structuredClone({ tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch });
+  const { tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch, retiredBarbers } = businessConfig;
+  return structuredClone({ tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch, retiredBarbers });
 }
 
 /** Guarda los cambios (solo administradores) y los aplica de inmediato en esta pestaña. */

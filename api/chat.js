@@ -66,7 +66,10 @@ async function loadBusiness(db) {
     db.get('barbers?select=id,name,short_name,role,available,specialties&order=name'),
     db.get('products?select=name,brand,price&active=eq.true&order=name').catch(() => []),
   ]);
-  return { settings: settingsRows[0]?.data ?? {}, services, barbers, products };
+  const settings = settingsRows[0]?.data ?? {};
+  // Los retirados del equipo (Panel → Barberos) no se ofrecen
+  const retired = new Set(Array.isArray(settings.retiredBarbers) ? settings.retiredBarbers : []);
+  return { settings, services, barbers: barbers.filter((b) => !retired.has(b.id)), products };
 }
 
 /** Datos del negocio para el modelo. Cambia poco: va en el prompt de sistema y se guarda en caché. */

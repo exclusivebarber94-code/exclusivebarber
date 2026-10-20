@@ -1,7 +1,7 @@
  import { useState, useEffect } from 'react';
 import { Star, CheckCircle } from 'lucide-react';
 import { ClipperIcon } from '../../components/common/BarberIcons';
-import { getBarbers } from '../../services/barbers';
+import { getTeam } from '../../services/barbers';
 import { supabase } from '../../lib/supabase';
 import type { Barber } from '../../types';
 import BarberAvatar from '../../components/common/BarberAvatar';
@@ -18,7 +18,7 @@ export default function ReviewPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getBarbers()
+    getTeam()
       .then(setBarbers)
       .catch((err) => console.error('No se pudieron cargar los barberos', err));
   }, []);
