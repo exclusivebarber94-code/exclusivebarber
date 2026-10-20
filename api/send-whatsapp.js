@@ -7,10 +7,12 @@
 // Variables de entorno en Vercel:
 //   VITE_SUPABASE_URL (o APP_SUPABASE_URL), APP_SUPABASE_SERVICE_ROLE_KEY (llave service_role de ese proyecto)
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM, TWILIO_WHATSAPP_TO
+//   TWILIO_TEMPLATE_CLIENTE, TWILIO_TEMPLATE_DUENO (SIDs HX… de las plantillas aprobadas)
 
-// SIDs de las plantillas aprobadas por WhatsApp
-const CLIENT_TEMPLATE_SID = 'HX3e85a8446dba0bb58f8a9a9a69f478e3db';
-const OWNER_TEMPLATE_SID = 'HX72c927857b5f25142b698ce7a218b874';
+// SIDs de las plantillas aprobadas por WhatsApp (Twilio → Content Template Builder).
+// Los valores fijos son los de la cuenta anterior; la cuenta nueva usa los de Vercel.
+const CLIENT_TEMPLATE_SID = process.env.TWILIO_TEMPLATE_CLIENTE || 'HX3e85a8446dba0bb58f8a9a9a69f478e3db';
+const OWNER_TEMPLATE_SID = process.env.TWILIO_TEMPLATE_DUENO || 'HX72c927857b5f25142b698ce7a218b874';
 
 const MAX_AGE_MS = 15 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
