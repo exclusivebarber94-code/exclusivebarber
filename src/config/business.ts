@@ -14,9 +14,9 @@ export const businessConfig: BusinessConfig = {
   country: 'Colombia',
   primaryColor: '#D4AF37',
   accentColor: '#6B4C2B',
-  mapEmbedUrl: 'https://maps.google.com/maps?q=10.483850,-73.261116&z=17&output=embed',
+  mapEmbedUrl: 'https://maps.google.com/maps?q=10.483899,-73.261163&z=17&output=embed',
   // Ubicación exacta del local para el mapa (confirmada por el negocio)
-  location: { lat: 10.48385, lng: -73.261116 },
+  location: { lat: 10.483899, lng: -73.261163 },
   hours: [
     { day: 'Lunes', open: '09:00', close: '19:00', closed: false },
     { day: 'Martes', open: '09:00', close: '19:00', closed: false },
