@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
   CalendarDays, Wallet, History, User, LogOut, Star, Check, X, CheckCheck, MessageCircle, Clock,
-  KeyRound, Loader2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Scissors,
+  KeyRound, Loader2, CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, Scissors, UserPlus,
 } from 'lucide-react';
 import BarberLogin from './BarberLogin';
+import BarberNewClient from './BarberNewClient';
 import { usePageMeta } from '../../hooks/usePageMeta';
 import { getBarberBookings, setBarberBookingStatus, changeBarberPin, BarberPortalError } from '../../services/barberPortal';
 import { formatCOP } from '../../data';
@@ -117,7 +118,7 @@ function AgendaTab({ appts, barber, onStatus, busyId }: { appts: Booking[]; barb
             >
               <span className={`text-[10px] font-semibold uppercase ${selected ? 'text-gold' : 'text-zinc-500'}`}>{i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : dayShort(d)}</span>
               <span className={`text-xl font-bold font-mono ${selected ? 'text-gold' : 'text-white'}`}>{dayOfMonth(d)}</span>
-              <span className={`text-[10px] ${count ? 'text-emerald-400 font-semibold' : 'text-zinc-600'}`}>{count ? `${count} citas` : monthShort(d)}</span>
+              <span className={`text-[10px] ${count ? 'text-emerald-400 font-semibold' : 'text-zinc-600'}`}>{count ? `${count} ${count === 1 ? 'cita' : 'citas'}` : monthShort(d)}</span>
             </button>
           );
         })}
@@ -430,6 +431,8 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
   const [busyId, setBusyId] = useState<string | null>(null);
   const [shiftNotice, setShiftNotice] = useState('');
   const [error, setError] = useState('');
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [savedNotice, setSavedNotice] = useState('');
 
   const handlePortalError = (err: unknown, fallback: string) => {
     console.error(fallback, err);
@@ -464,6 +467,16 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
       handlePortalError(err, 'No se pudo guardar el cambio. Intenta de nuevo.');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const clientSaved = async (message: string) => {
+    setShowNewClient(false);
+    setSavedNotice(message);
+    try {
+      setAppts(await getBarberBookings(barber.id, pin));
+    } catch (err) {
+      handlePortalError(err, 'No se pudieron cargar tus citas. Se reintentará automáticamente.');
     }
   };
 
@@ -505,10 +518,26 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-7">
-        <h1 className="font-serif text-2xl sm:text-3xl font-bold text-white mb-5">
-          {TABS.find((t) => t.id === tab)?.label}
-          {tab === 'agenda' && <span className="block text-sm font-sans font-normal text-zinc-500 mt-1">Toca un día para ver sus citas · {lowerFirst(formatDateLong(today))}</span>}
-        </h1>
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-white">
+            {TABS.find((t) => t.id === tab)?.label}
+            {tab === 'agenda' && <span className="block text-sm font-sans font-normal text-zinc-500 mt-1">Toca un día para ver sus citas · {lowerFirst(formatDateLong(today))}</span>}
+          </h1>
+          {tab === 'agenda' && loaded && (
+            <button
+              onClick={() => { setSavedNotice(''); setShowNewClient(true); }}
+              className="btn-gold shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+            >
+              <UserPlus size={16} /> Cliente nuevo
+            </button>
+          )}
+        </div>
+        {savedNotice && (
+          <div className="mb-5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm flex items-start justify-between gap-3">
+            <span>{savedNotice}</span>
+            <button onClick={() => setSavedNotice('')} className="text-emerald-200/70 hover:text-emerald-100 text-xs shrink-0">Cerrar</button>
+          </div>
+        )}
         {error && <div className="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>}
         {shiftNotice && (
           <div className="mb-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-sm flex items-start justify-between gap-3">
@@ -530,6 +559,17 @@ function BarberDashboard({ barber, pin, onLogout, onPinChanged }: { barber: Barb
           </>
         )}
       </main>
+
+      {showNewClient && (
+        <BarberNewClient
+          barber={barber}
+          pin={pin}
+          appts={appts}
+          onClose={() => setShowNewClient(false)}
+          onSaved={clientSaved}
+          onAuthError={onLogout}
+        />
+      )}
 
       {/* Celular: barra inferior */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 glass border-t border-white/10 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] grid grid-cols-4" aria-label="Secciones">
