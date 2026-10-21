@@ -85,6 +85,10 @@ html[data-theme='light'] #inicio { background: radial-gradient(ellipse at 30% 50
 
 /* Mapa: sin el filtro que lo oscurece */
 html[data-theme='light'] .eb-map .leaflet-tile-pane { filter: saturate(0.8); }
+html[data-theme='light'] .eb-street-base { stroke: #ffffff; }
+html[data-theme='light'] .eb-street-glow { stroke: #b8901c; stroke-opacity: 0.45; }
+html[data-theme='light'] .eb-street-label { color: #3f3f46; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff; }
+html[data-theme='light'] .eb-street-label--main { color: #8a6a10; }
 html[data-theme='light'] .eb-map .leaflet-control-zoom a { background: #ffffff; color: #18181b; }
 html[data-theme='light'] .eb-map .leaflet-control-attribution { background: rgba(255, 255, 255, 0.8); }
 

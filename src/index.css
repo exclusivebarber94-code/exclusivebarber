@@ -607,6 +607,15 @@
 .eb-map .leaflet-popup-content-wrapper, .eb-map .leaflet-popup-tip {
   background: #141414; color: #fff; border: 1px solid rgba(212, 175, 55, 0.4); box-shadow: 0 10px 30px rgba(0,0,0,.5);
 }
+/* Calles con el nombre corregido (BarberMap.tsx): la base tiene el color de las calles del mapa */
+.eb-street-base { stroke: #0b0b0b; }
+.eb-street-glow { stroke: #D4AF37; stroke-opacity: 0.55; }
+.eb-street-label {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -50%) rotate(var(--angle));
+  white-space: nowrap; pointer-events: none; font: 500 12px Inter, sans-serif; letter-spacing: 0.02em;
+  color: #d4d4d8; text-shadow: 0 0 3px #0b0b0b, 0 0 3px #0b0b0b, 0 0 2px #0b0b0b;
+}
+.eb-street-label--main { color: #E8C766; font-weight: 700; }
 .eb-popup { display: flex; flex-direction: column; gap: 2px; font-family: Inter, sans-serif; }
 .eb-popup strong { color: #E8C766; font-size: 13px; }
 .eb-popup span { color: #d4d4d8; font-size: 12px; }
