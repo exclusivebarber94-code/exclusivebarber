@@ -4,6 +4,7 @@ import {
   Eye, EyeOff, KeyRound, Users, Megaphone, MessageCircle, Bell,
 } from 'lucide-react';
 import NotificationSoundsPanel from '../../components/admin/NotificationSoundsPanel';
+import RecallCard from '../../components/admin/RecallCard';
 import { currentSettings, saveSettings, DAYS_AHEAD_OPTIONS, type EditableSettings } from '../../services/settings';
 import { changeAdminPassword, currentAdminEmail, AdminAuthError } from '../../services/adminAuth';
 import { getTeam, updateBarber } from '../../services/barbers';
@@ -611,6 +612,7 @@ function RulesTab() {
     <div className="grid lg:grid-cols-2 gap-5">
       <BookingRulesCard />
       <AnyBarberCard />
+      <RecallCard />
       <Panel title="Reglas de reserva" subtitle="Funcionan automáticamente">
         <Row label="El servicio debe terminar antes del cierre" value="Sí" />
         <Row label="Citas que se cruzan con otra del mismo profesional" value="No se permiten" />

@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import AnimatedBarberBackground from './AnimatedBarberBackground';
 import WhatsAppChat from './WhatsAppChat';
 import SocialFloat from './SocialFloat';
 import BookingModal from '../booking/BookingModal';
+import { getServices } from '../../services/services';
 import type { Service } from '../../types';
 
 interface Props {
@@ -21,6 +22,21 @@ export default function PublicLayout({ children }: Props) {
     setPreselectedService(service || null);
     setBookingOpen(true);
   };
+
+  // Enlace directo a la reserva: /reservar o /reservar/<id del servicio> (lo usa el WhatsApp
+  // «ya es hora de volver»). Se lee al cargar, antes de que la dirección vuelva a «/».
+  const [deepLink] = useState(() => {
+    const match = window.location.pathname.match(/^\/reservar(?:\/([\w-]+))?\/?$/);
+    return match ? match[1] ?? '' : null;
+  });
+  useEffect(() => {
+    if (deepLink === null) return;
+    let cancelled = false;
+    const find = deepLink ? getServices().then((list) => list.find((s) => s.id === deepLink)).catch(() => undefined) : Promise.resolve(undefined);
+    find.then((service) => { if (!cancelled) openBooking(service); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLink]);
 
   return (
     <div className="min-h-screen bg-dark relative">

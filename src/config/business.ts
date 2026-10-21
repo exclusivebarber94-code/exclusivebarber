@@ -38,6 +38,8 @@ export const businessConfig: BusinessConfig = {
   // Almuerzo: no se reciben reservas por la web en ese rango, salvo domingos y festivos
   // (se cambia en Panel → Configuración → Horario)
   lunch: { enabled: true, start: '12:00', end: '13:00' },
+  // WhatsApp «ya es hora de volver» (Panel → Configuración → Reglas)
+  recall: { enabled: true },
   // Integrantes retirados (Panel → Barberos): se ocultan de la web y del equipo, sin borrar su historial
   retiredBarbers: [],
   // Reglas de reserva (se cambian en Panel → Configuración → Reglas)

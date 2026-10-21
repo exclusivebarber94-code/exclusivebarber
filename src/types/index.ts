@@ -115,6 +115,8 @@ export interface BusinessConfig {
   allowAnyBarber: boolean;
   /** Almuerzo: sin reservas por la web en ese rango (no aplica domingos ni festivos) */
   lunch: LunchBreak;
+  /** WhatsApp «ya es hora de volver» según el ritmo de visitas de cada cliente */
+  recall: { enabled: boolean };
   /** Integrantes retirados del equipo (ids): no se muestran, pero su historial sigue en los reportes */
   retiredBarbers: string[];
   /** Cada cuántos minutos empieza una cita (09:00, 09:30…) */

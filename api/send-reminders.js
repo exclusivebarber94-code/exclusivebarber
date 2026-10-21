@@ -9,8 +9,10 @@
 // Variables de entorno en Vercel: las de send-whatsapp, más
 //   REMINDERS_SECRET (el mismo valor de notification_settings.reminders_secret)
 //   TWILIO_TEMPLATE_RECORDATORIO (SID HX… de la plantilla aprobada)
+//   TWILIO_TEMPLATE_REGRESO (opcional): «ya es hora de volver», ver _recall.js
 
 import { connectDb, summarize, dateWithWeekday, startMs, bogotaDate, whatsappTo, sendTemplate, twilioReady } from './_reserva.js';
+import { sendRecalls } from './_recall.js';
 
 const HOUR = 3600e3;
 const KINDS = [
@@ -71,6 +73,14 @@ export default async function handler(req, res) {
         await db(`bookings?id=in.(${claimed.map((x) => x.id).join(',')})`, { method: 'PATCH', body: JSON.stringify({ [kind.column]: null }) });
       }
     }
+  }
+  // «Ya es hora de volver» (solo en su ventana de horario; no frena los recordatorios de citas)
+  try {
+    const settings = await db('business_settings?select=data&limit=1').then((r) => r.json()).then((rows) => rows[0]?.data ?? {});
+    report.recall = await sendRecalls(db, settings);
+  } catch (error) {
+    console.error('Recordatorio para volver', error);
+    report.recall = { error: error.message };
   }
   return res.status(200).json(report);
 }

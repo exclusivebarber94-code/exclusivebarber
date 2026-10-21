@@ -8,7 +8,7 @@ import type { BusinessConfig, BusinessHours, LunchBreak, SpecialDay } from '../t
 
 export type EditableSettings = Pick<
   BusinessConfig,
-  'tagline' | 'address' | 'phone' | 'whatsapp' | 'email' | 'instagram' | 'tiktok' | 'facebook' | 'hours' | 'holidayHours' | 'specialDays' | 'allowAnyBarber' | 'slotStep' | 'daysAhead' | 'lunch' | 'retiredBarbers'
+  'tagline' | 'address' | 'phone' | 'whatsapp' | 'email' | 'instagram' | 'tiktok' | 'facebook' | 'hours' | 'holidayHours' | 'specialDays' | 'allowAnyBarber' | 'slotStep' | 'daysAhead' | 'lunch' | 'retiredBarbers' | 'recall'
 >;
 
 /** Opciones de «las citas empiezan cada…» (minutos) */
@@ -54,6 +54,7 @@ function apply(data: Partial<EditableSettings>) {
   if (validSlotStep(data.slotStep)) businessConfig.slotStep = data.slotStep;
   if (validDaysAhead(data.daysAhead)) businessConfig.daysAhead = data.daysAhead;
   if (validLunch(data.lunch)) businessConfig.lunch = data.lunch;
+  if (typeof data.recall?.enabled === 'boolean') businessConfig.recall = { enabled: data.recall.enabled };
   if (Array.isArray(data.retiredBarbers) && data.retiredBarbers.every((x) => typeof x === 'string')) businessConfig.retiredBarbers = data.retiredBarbers;
   if (Array.isArray(data.specialDays) && data.specialDays.every(validSpecialDay)) {
     businessConfig.specialDays = [...data.specialDays].sort((a, b) => a.date.localeCompare(b.date));
@@ -72,8 +73,8 @@ export async function loadSettings(): Promise<void> {
 }
 
 export function currentSettings(): EditableSettings {
-  const { tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch, retiredBarbers } = businessConfig;
-  return structuredClone({ tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch, retiredBarbers });
+  const { tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch, retiredBarbers, recall } = businessConfig;
+  return structuredClone({ tagline, address, phone, whatsapp, email, instagram, tiktok, facebook, hours, holidayHours, specialDays, allowAnyBarber, slotStep, daysAhead, lunch, retiredBarbers, recall });
 }
 
 /** Guarda los cambios (solo administradores) y los aplica de inmediato en esta pestaña. */
