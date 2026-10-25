@@ -180,6 +180,13 @@ export interface CreatedBooking {
   barberShortName: string;
 }
 
+/** Horas de las citas activas que ese celular ya tiene ese día (para avisar antes de reservar otra). */
+export async function clientBookingsOn(phone: string, date: string): Promise<string[]> {
+  const { data, error } = await supabase.rpc('client_bookings_on', { p_phone: phone, p_date: date });
+  if (error) throw error;
+  return (data as string[] | null) ?? [];
+}
+
 export async function createBooking(booking: NewBooking): Promise<CreatedBooking> {
   const { data, error } = await supabase.rpc('create_booking', {
     p_service_id: booking.serviceId,

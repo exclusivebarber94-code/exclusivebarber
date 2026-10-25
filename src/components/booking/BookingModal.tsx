@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Service } from '../../types';
-import { createBooking, BookingError, type BookingErrorCode } from '../../services/bookings';
+import { createBooking, clientBookingsOn, BookingError, type BookingErrorCode } from '../../services/bookings';
 import { businessConfig } from '../../config/business';
 import { loadClientContact, saveClientContact, type ClientContact } from '../../lib/clientContact';
 import { storedPhone } from '../../lib/phoneCountry';
 import AppointmentStep, { type Appointment } from './AppointmentStep';
 import DetailsStep from './DetailsStep';
 import BookingTicket, { type TicketData } from './BookingTicket';
-import { timeToMinutes, minutesToTime } from '../../lib/dates';
+import { timeToMinutes, minutesToTime, formatDateLong } from '../../lib/dates';
 import { cartSchedule, cartDuration, cartPrice } from '../../lib/bookingCart';
 
 interface BookingModalProps {
@@ -63,6 +63,8 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Ese celular ya tiene cita ese día: se pregunta antes de reservar otra (pasaba al no llegar confirmación)
+  const [duplicateTimes, setDuplicateTimes] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -71,6 +73,7 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
       setContact(loadClientContact());
       setTicket(null);
       setError('');
+      setDuplicateTimes(null);
     }
   }, [isOpen, preselectedService]);
 
@@ -87,12 +90,26 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
 
   if (!isOpen) return null;
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (allowDuplicate = false) => {
     const { items, barber, date, time } = appointment;
     if (items.length === 0) return;
     const schedule = cartSchedule(items, time);
     setLoading(true);
     setError('');
+    setDuplicateTimes(null);
+    if (!allowDuplicate) {
+      try {
+        const times = await clientBookingsOn(storedPhone(contact.country, contact.phone), date);
+        if (times.length > 0) {
+          setDuplicateTimes(times);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        // Si no se puede revisar, se sigue con la reserva
+        console.warn('No se pudo revisar si ya tenía cita', err);
+      }
+    }
     const created: { bookingId: string; barberName: string }[] = [];
     try {
       // Cada servicio es una cita, uno detrás de otro y con el mismo barbero
@@ -190,6 +207,24 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
               </div>
             )}
 
+            {duplicateTimes && (
+              <div className="absolute inset-0 z-20 flex items-end sm:items-center justify-center p-4 bg-black/70 backdrop-blur-sm" role="alertdialog" aria-label="Ya tienes una cita ese día">
+                <div className="w-full max-w-sm rounded-2xl border border-gold/30 bg-[#121212] p-5 text-center">
+                  <p className="text-gold text-xs uppercase tracking-[0.2em]">Ya tienes una cita</p>
+                  <p className="text-white text-lg font-semibold mt-2">
+                    {formatDateLong(appointment.date)} a las {duplicateTimes.join(' y ')}
+                  </p>
+                  <p className="text-zinc-400 text-sm mt-2">Tu reserva anterior está guardada. ¿Quieres reservar otra cita ese mismo día?</p>
+                  <div className="grid gap-2 mt-5">
+                    <button onClick={onClose} className="btn-gold py-3 rounded-full font-semibold">No, ya tengo mi cita</button>
+                    <button onClick={() => handleConfirm(true)} className="py-3 rounded-full border border-white/15 text-zinc-200 text-sm font-medium hover:border-gold/50">
+                      Sí, reservar otra
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex-1 min-h-0">
               {step === 'cita' ? (
                 <AppointmentStep
@@ -203,7 +238,7 @@ export default function BookingModal({ isOpen, onClose, preselectedService }: Bo
                   contact={contact}
                   loading={loading}
                   onChange={setContact}
-                  onConfirm={handleConfirm}
+                  onConfirm={() => handleConfirm()}
                   onBack={() => setStep('cita')}
                 />
               )}

@@ -93,6 +93,9 @@ export default function AdminMessages() {
                   <div>
                     <p className="text-white font-semibold flex items-center gap-2">
                       {m.name}
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${m.source === 'whatsapp' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-zinc-300'}`}>
+                        {m.source === 'whatsapp' ? 'WhatsApp de avisos' : 'Chat de la web'}
+                      </span>
                       {!m.read && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold text-dark">NUEVO</span>}
                     </p>
                     <p className="text-zinc-500 text-xs">{formatPhone(m.phone)} · {relativeTime(m.createdAt)}</p>

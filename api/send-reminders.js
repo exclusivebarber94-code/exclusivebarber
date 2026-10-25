@@ -10,9 +10,11 @@
 //   REMINDERS_SECRET (el mismo valor de notification_settings.reminders_secret)
 //   TWILIO_TEMPLATE_RECORDATORIO (SID HX… de la plantilla aprobada)
 //   TWILIO_TEMPLATE_REGRESO (opcional): «ya es hora de volver», ver _recall.js
+//   TWILIO_TEMPLATE_MENSAJE (opcional): reenvío de mensajes de clientes al negocio, ver _forward.js
 
 import { connectDb, summarize, dateWithWeekday, startMs, bogotaDate, whatsappTo, sendTemplate, twilioReady } from './_reserva.js';
 import { sendRecalls } from './_recall.js';
+import { forwardClientMessages } from './_forward.js';
 
 const HOUR = 3600e3;
 const KINDS = [
@@ -73,6 +75,13 @@ export default async function handler(req, res) {
         await db(`bookings?id=in.(${claimed.map((x) => x.id).join(',')})`, { method: 'PATCH', body: JSON.stringify({ [kind.column]: null }) });
       }
     }
+  }
+  // Mensajes que los clientes le escribieron al número de avisos → WhatsApp de la barbería
+  try {
+    report.messages = await forwardClientMessages(db);
+  } catch (error) {
+    console.error('Reenvío de mensajes', error);
+    report.messages = { error: error.message };
   }
   // «Ya es hora de volver» (solo en su ventana de horario; no frena los recordatorios de citas)
   try {

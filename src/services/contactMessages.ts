@@ -8,6 +8,8 @@ export interface ContactMessage {
   message: string;
   read: boolean;
   createdAt: string;
+  /** 'web': chat de la página · 'whatsapp': le escribió al número de avisos */
+  source: 'web' | 'whatsapp';
 }
 
 export type ContactMessageError = 'INVALID_NAME' | 'INVALID_PHONE' | 'INVALID_MESSAGE' | 'TOO_MANY_MESSAGES' | 'UNKNOWN';
@@ -36,14 +38,14 @@ export async function sendContactMessage(name: string, phone: string, message: s
  * por consulta, así que se piden por páginas); con `limit`, solo los más recientes (la campanita).
  */
 export async function getContactMessages(limit?: number): Promise<ContactMessage[]> {
-  type Row = { id: string; name: string; phone: string; message: string; read: boolean; created_at: string };
+  type Row = { id: string; name: string; phone: string; message: string; read: boolean; created_at: string; source?: string };
   const PAGE = 1000;
   const rows: Row[] = [];
   for (let from = 0; ; from += PAGE) {
     const size = limit ? Math.min(PAGE, limit - from) : PAGE;
     const { data, error } = await supabase
       .from('contact_messages')
-      .select('id, name, phone, message, read, created_at')
+      .select('*')
       .order('created_at', { ascending: false })
       .order('id')
       .range(from, from + size - 1);
@@ -58,6 +60,7 @@ export async function getContactMessages(limit?: number): Promise<ContactMessage
     message: r.message,
     read: r.read,
     createdAt: r.created_at,
+    source: r.source === 'whatsapp' ? 'whatsapp' : 'web',
   }));
 }
 

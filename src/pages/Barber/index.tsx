@@ -6,6 +6,7 @@ import {
 import BarberLogin from './BarberLogin';
 import BarberNewClient from './BarberNewClient';
 import { usePageMeta } from '../../hooks/usePageMeta';
+import { businessConfig } from '../../config/business';
 import { getBarberBookings, setBarberBookingStatus, changeBarberPin, BarberPortalError } from '../../services/barberPortal';
 import { formatCOP } from '../../data';
 import { todayKey, addDays, dayShort, dayOfMonth, monthShort, monthLong, formatDateLong, nowMinutes, timeToMinutes } from '../../lib/dates';
@@ -92,8 +93,16 @@ function AppointmentCard({ b, onStatus, busy }: { b: Booking; onStatus: (id: str
 
 function AgendaTab({ appts, barber, onStatus, busyId }: { appts: Booking[]; barber: Barber; onStatus: (id: string, s: Booking['status']) => void; busyId: string | null }) {
   const today = todayKey();
-  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+  // Todos los días en que se puede reservar (y más, si ya hay alguna cita después)
+  const upcoming = appts.filter((b) => b.date > today && isOpen(b)).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  const lastDay = [addDays(today, businessConfig.daysAhead), upcoming.at(-1)?.date ?? today].sort().at(-1)!;
+  const days = Array.from({ length: Math.round((Date.parse(lastDay) - Date.parse(today)) / 864e5) + 1 }, (_, i) => addDays(today, i));
   const [day, setDay] = useState(today);
+  const chooseDay = (d: string) => {
+    setDay(d);
+    document.getElementById(`agenda-day-${d}`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const list = appts.filter((b) => b.date === day).sort((a, b) => a.time.localeCompare(b.time));
   const active = list.filter((b) => b.status !== 'cancelled');
   const done = list.filter((b) => b.status === 'completed');
@@ -110,6 +119,7 @@ function AgendaTab({ appts, barber, onStatus, busyId }: { appts: Booking[]; barb
           return (
             <button
               key={d}
+              id={`agenda-day-${d}`}
               onClick={() => setDay(d)}
               aria-pressed={selected}
               className={`flex flex-col items-center min-w-[64px] px-3 py-2.5 rounded-2xl border shrink-0 transition-all ${
@@ -153,6 +163,30 @@ function AgendaTab({ appts, barber, onStatus, busyId }: { appts: Booking[]; barb
         ) : (
           <ul className="space-y-2.5">
             {list.map((b) => <AppointmentCard key={b.id} b={b} onStatus={onStatus} busy={busyId === b.id} />)}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel title="Próximas citas" subtitle={upcoming.length ? `${upcoming.length} ${upcoming.length === 1 ? 'cita' : 'citas'} después de hoy` : 'Todo lo que viene'} bodyClassName="p-3 sm:p-4">
+        {upcoming.length === 0 ? (
+          <EmptyState icon={CalendarDays}>No tienes citas agendadas después de hoy.</EmptyState>
+        ) : (
+          <ul className="divide-y divide-white/[0.06]">
+            {upcoming.map((b) => (
+              <li key={b.id}>
+                <button onClick={() => chooseDay(b.date)} className="w-full flex items-center gap-3 py-2.5 px-1 text-left hover:bg-white/[0.03] rounded-lg">
+                  <span className="w-28 shrink-0">
+                    <span className="block text-xs text-zinc-400">{b.date === addDays(today, 1) ? 'Mañana' : formatDateLong(b.date)}</span>
+                    <span className="block font-mono text-gold font-semibold">{b.time}</span>
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-white text-sm font-medium truncate">{b.clientName}</span>
+                    <span className="block text-zinc-500 text-xs truncate">{b.serviceName}</span>
+                  </span>
+                  <StatusBadge status={b.status} />
+                </button>
+              </li>
+            ))}
           </ul>
         )}
       </Panel>
